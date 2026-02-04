@@ -48,8 +48,20 @@ function createLoggerProvider() {
     })
   );
 
-  const provider = new LoggerProvider({ resource });
-  provider.addLogRecordProcessor(new BatchLogRecordProcessor(createExporter()));
+  const processor = new BatchLogRecordProcessor(createExporter());
+  let provider;
+  if (typeof LoggerProvider.prototype.addLogRecordProcessor === 'function') {
+    provider = new LoggerProvider({ resource });
+    provider.addLogRecordProcessor(processor);
+    return provider;
+  }
+  if (typeof LoggerProvider.prototype.addProcessor === 'function') {
+    provider = new LoggerProvider({ resource });
+    provider.addProcessor(processor);
+    return provider;
+  }
+  // Newer SDKs accept processors in the constructor.
+  provider = new LoggerProvider({ resource, processors: [processor] });
   return provider;
 }
 
