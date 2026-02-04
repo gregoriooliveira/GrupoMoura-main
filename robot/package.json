@@ -1,0 +1,16 @@
+{
+  "name": "robot-api-caller",
+  "version": "1.0.0",
+  "description": "Robot para chamar APIs do backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.6.2",
+    "dotenv": "^16.3.1"
+  }
+}

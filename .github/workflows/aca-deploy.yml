@@ -1,0 +1,82 @@
+name: Build and Deploy to ACA
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  REGISTRY: docker.io
+  DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+  BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/nodejs-lab-backend
+  ROBOT_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/nodejs-lab-robot
+  RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+  ACA_ENVIRONMENT: ${{ secrets.ACA_ENVIRONMENT }}
+  ACA_BACKEND_APP: ${{ secrets.ACA_BACKEND_APP }}
+  ACA_ROBOT_APP: ${{ secrets.ACA_ROBOT_APP }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+            ${{ env.BACKEND_IMAGE }}:latest
+
+      - name: Build and push robot image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./robot
+          file: ./robot/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.ROBOT_IMAGE }}:${{ github.sha }}
+            ${{ env.ROBOT_IMAGE }}:latest
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy backend to ACA
+        run: |
+          az containerapp update \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$ACA_BACKEND_APP" \
+            --image "$REGISTRY/$BACKEND_IMAGE:${{ github.sha }}"
+
+      - name: Deploy robot to ACA
+        run: |
+          az containerapp update \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$ACA_ROBOT_APP" \
+            --image "$REGISTRY/$ROBOT_IMAGE:${{ github.sha }}"

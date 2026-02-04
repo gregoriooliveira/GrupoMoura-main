@@ -1,0 +1,28 @@
+helm template splunk-otel-collector --set="cloudProvider=azure,splunkObservability.accessToken=x5HPi6Q5ZsncVCzyvLXd9g,clusterName=greg-cluster,splunkObservability.realm=us1,gateway.enabled=false,splunkPlatform.endpoint=https://http-inputs-acumuladoresmoura.splunkcloud.com:8088/services/collector,splunkPlatform.token=76e22922-d767-42a8-ac5a-aa65d99dca83,splunkObservability.profilingEnabled=true,environment=lab,operatorcrds.install=true,operator.enabled=true,agent.discovery.enabled=true" splunk-otel-collector-chart/splunk-otel-collector
+
+
+helm template splunk-otel-collector \
+    splunk-otel-collector-chart/splunk-otel-collector \
+    --set="cloudProvider=azure,splunkObservability.accessToken=x5HPi6Q5ZsncVCzyvLXd9g,clusterName=greg-cluster,splunkObservability.realm=us1,gateway.enabled=false,splunkPlatform.endpoint=https://http-inputs-acumuladoresmoura.splunkcloud.com:8088/services/collector,splunkPlatform.token=76e22922-d767-42a8-ac5a-aa65d99dca83,splunkObservability.profilingEnabled=true,environment=lab,operatorcrds.install=true,operator.enabled=true,agent.discovery.enabled=true" \
+    > rendered-manifest.yaml
+
+# GRAVAR LOGS
+
+curl -k "https://http-inputs-acumuladoresmoura.splunkcloud.com/services/collector" \
+  -H "Authorization: Splunk 76e22922-d767-42a8-ac5a-aa65d99dca83" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event": "teste dumont",
+    "sourcetype": "manual",
+    "index": "moura_facil"
+  }'
+
+curl -k "https://http-inputs-acumuladoresmoura.splunkcloud.com/services/collector/event" \
+  -H "Authorization: Splunk 76e22922-d767-42a8-ac5a-aa65d99dca83" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event": "teste dumont 2",
+    "sourcetype": "manual",
+    "index": "moura_facil"
+  }'
+

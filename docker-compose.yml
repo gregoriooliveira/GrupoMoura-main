@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: cotacoes-postgres
+    # greg-postgres-cotacoes
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: cotacoes
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cotacoes-api
+    # greg-nodejs-lab-backend
+    # greg-postgres-cotacoes--bcgq846
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      DB_USER: postgres
+      DB_HOST: postgres
+      DB_NAME: cotacoes
+      DB_PASSWORD: postgres
+      DB_PORT: 5432
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  robot:
+    build:
+      context: ./robot
+      dockerfile: Dockerfile
+    container_name: cotacoes-robot
+    # http://greg-nodejs-lab-backend--0000004:3000
+    # greg-nodejs-lab-robot
+    environment:
+      BACKEND_URL: http://api:3000
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge
+

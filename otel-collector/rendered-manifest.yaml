@@ -1,0 +1,2619 @@
+---
+# Source: splunk-otel-collector/charts/operator/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+automountServiceAccountToken: true
+metadata:
+  name: operator
+  namespace: default
+  labels:
+    helm.sh/chart: operator-0.95.3
+    app.kubernetes.io/name: operator
+    app.kubernetes.io/version: "0.134.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: opentelemetry-operator
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/component: controller-manager
+---
+# Source: splunk-otel-collector/templates/serviceAccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+automountServiceAccountToken: true
+metadata:
+  name: splunk-otel-collector
+  namespace: default
+  labels:
+    app.kubernetes.io/name: splunk-otel-collector
+    helm.sh/chart: splunk-otel-collector-0.143.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/version: "0.143.0"
+    app: splunk-otel-collector
+    chart: splunk-otel-collector-0.143.0
+    release: splunk-otel-collector
+---
+# Source: splunk-otel-collector/templates/secret-splunk.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: splunk-otel-collector
+  namespace: default
+  labels:
+    app.kubernetes.io/name: splunk-otel-collector
+    helm.sh/chart: splunk-otel-collector-0.143.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/version: "0.143.0"
+    app: splunk-otel-collector
+    chart: splunk-otel-collector-0.143.0
+    release: splunk-otel-collector
+type: Opaque
+data:
+  splunk_observability_access_token: eDVIUGk2UTVac25jVkN6eXZMWGQ5Zw==
+  splunk_platform_hec_token: NzZlMjI5MjItZDc2Ny00MmE4LWFjNWEtYWE2NWQ5OWRjYTgz
+---
+# Source: splunk-otel-collector/templates/configmap-agent.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: splunk-otel-collector-otel-agent
+  namespace: default
+  labels:
+    app.kubernetes.io/name: splunk-otel-collector
+    helm.sh/chart: splunk-otel-collector-0.143.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/version: "0.143.0"
+    app: splunk-otel-collector
+    chart: splunk-otel-collector-0.143.0
+    release: splunk-otel-collector
+data:
+  relay: |
+    exporters:
+      otlphttp:
+        auth:
+          authenticator: headers_setter
+        metrics_endpoint: https://ingest.us1.signalfx.com/v2/datapoint/otlp
+        traces_endpoint: https://ingest.us1.signalfx.com/v2/trace/otlp
+      otlphttp/entities:
+        auth:
+          authenticator: headers_setter
+        logs_endpoint: https://ingest.us1.signalfx.com/v3/event
+      signalfx:
+        access_token: ${SPLUNK_OBSERVABILITY_ACCESS_TOKEN}
+        api_url: https://api.us1.signalfx.com
+        correlation: null
+        ingest_url: https://ingest.us1.signalfx.com
+        root_path: /hostfs
+        sync_host_metadata: true
+      signalfx/histograms:
+        access_token: ${SPLUNK_OBSERVABILITY_ACCESS_TOKEN}
+        api_url: https://api.us1.signalfx.com
+        ingest_url: https://ingest.us1.signalfx.com
+        send_otlp_histograms: true
+      splunk_hec/o11y:
+        disable_compression: true
+        endpoint: https://ingest.us1.signalfx.com/v1/log
+        log_data_enabled: false
+        profiling_data_enabled: true
+        token: ${SPLUNK_OBSERVABILITY_ACCESS_TOKEN}
+      splunk_hec/platform_logs:
+        disable_compression: true
+        endpoint: https://http-inputs-acumuladoresmoura.splunkcloud.com:8088/services/collector
+        idle_conn_timeout: 10s
+        index: main
+        max_idle_conns: 200
+        max_idle_conns_per_host: 200
+        profiling_data_enabled: false
+        retry_on_failure:
+          enabled: true
+          initial_interval: 5s
+          max_elapsed_time: 300s
+          max_interval: 30s
+        sending_queue:
+          enabled: true
+          num_consumers: 10
+          queue_size: 1000
+        source: kubernetes
+        splunk_app_name: splunk-otel-collector
+        splunk_app_version: 0.143.0
+        timeout: 10s
+        tls:
+          insecure_skip_verify: false
+        token: ${SPLUNK_PLATFORM_HEC_TOKEN}
+    extensions:
+      file_storage:
+        directory: /var/addon/splunk/otel_pos
+      headers_setter:
+        headers:
+        - action: upsert
+          default_value: ${SPLUNK_OBSERVABILITY_ACCESS_TOKEN}
+          from_context: X-SF-TOKEN
+          key: X-SF-TOKEN
+      health_check:
+        endpoint: 0.0.0.0:13133
+      k8s_observer:
+        auth_type: serviceAccount
+        node: ${K8S_NODE_NAME}
+      zpages: null
+    processors:
+      batch:
+        metadata_keys:
+        - X-SF-Token
+      filter/logs:
+        logs:
+          exclude:
+            match_type: strict
+            resource_attributes:
+            - key: splunk.com/exclude
+              value: "true"
+      k8sattributes:
+        extract:
+          annotations:
+          - from: pod
+            key: splunk.com/sourcetype
+          - from: namespace
+            key: splunk.com/exclude
+            tag_name: splunk.com/exclude
+          - from: pod
+            key: splunk.com/exclude
+            tag_name: splunk.com/exclude
+          - from: namespace
+            key: splunk.com/index
+            tag_name: com.splunk.index
+          - from: pod
+            key: splunk.com/index
+            tag_name: com.splunk.index
+          labels:
+          - key: app
+          metadata:
+          - k8s.namespace.name
+          - k8s.node.name
+          - k8s.pod.name
+          - k8s.pod.uid
+          - container.id
+          - container.image.name
+          - container.image.tag
+        filter:
+          node_from_env_var: K8S_NODE_NAME
+        pod_association:
+        - sources:
+          - from: resource_attribute
+            name: k8s.pod.uid
+        - sources:
+          - from: resource_attribute
+            name: k8s.pod.ip
+        - sources:
+          - from: resource_attribute
+            name: ip
+        - sources:
+          - from: connection
+      memory_limiter:
+        check_interval: 2s
+        limit_mib: ${SPLUNK_MEMORY_LIMIT_MIB}
+      resource:
+        attributes:
+        - action: insert
+          key: k8s.node.name
+          value: ${K8S_NODE_NAME}
+        - action: upsert
+          key: k8s.cluster.name
+          value: greg-cluster
+      resource/add_agent_k8s:
+        attributes:
+        - action: insert
+          key: k8s.pod.name
+          value: ${K8S_POD_NAME}
+        - action: insert
+          key: k8s.pod.uid
+          value: ${K8S_POD_UID}
+        - action: insert
+          key: k8s.namespace.name
+          value: ${K8S_NAMESPACE}
+      resource/add_environment:
+        attributes:
+        - action: insert
+          key: deployment.environment
+          value: lab
+      resource/add_mode:
+        attributes:
+        - action: insert
+          key: otelcol.service.mode
+          value: agent
+      resource/logs:
+        attributes:
+        - action: upsert
+          from_attribute: k8s.pod.annotations.splunk.com/sourcetype
+          key: com.splunk.sourcetype
+        - action: delete
+          key: k8s.pod.annotations.splunk.com/sourcetype
+        - action: delete
+          key: splunk.com/exclude
+      resourcedetection:
+        detectors:
+        - env
+        - azure
+        - system
+        override: true
+        timeout: 15s
+    receivers:
+      filelog:
+        encoding: utf-8
+        exclude:
+        - /var/log/pods/default_splunk-otel-collector*_*/otel-collector/*.log
+        fingerprint_size: 1kb
+        force_flush_period: "0"
+        include:
+        - /var/log/pods/*/*/*.log
+        include_file_name: false
+        include_file_path: true
+        max_concurrent_files: 1024
+        max_log_size: 1MiB
+        operators:
+        - id: get-format
+          routes:
+          - expr: body matches "^\\{"
+            output: parser-docker
+          - expr: body matches "^[^ Z]+ "
+            output: parser-crio
+          - expr: body matches "^[^ ]+ "
+            output: parser-containerd
+          type: router
+        - id: parser-crio
+          regex: ^(?P<time>[^ Z]+) (?P<stream>stdout|stderr) (?P<logtag>[^ ]*) ?(?P<log>.*)$
+          timestamp:
+            layout: 2006-01-02T15:04:05.999999999Z07:00
+            layout_type: gotime
+            parse_from: attributes.time
+          type: regex_parser
+        - combine_field: attributes.log
+          combine_with: ""
+          id: crio-recombine
+          is_last_entry: attributes.logtag == 'F'
+          max_log_size: 1048576
+          output: handle_empty_log
+          source_identifier: attributes["log.file.path"]
+          type: recombine
+        - id: parser-containerd
+          regex: ^(?P<time>[^ ]+) (?P<stream>stdout|stderr) (?P<logtag>[^ ]*) ?(?P<log>.*)$
+          timestamp:
+            layout: 2006-01-02T15:04:05.999999999Z07:00
+            layout_type: gotime
+            parse_from: attributes.time
+          type: regex_parser
+        - combine_field: attributes.log
+          combine_with: ""
+          id: containerd-recombine
+          is_last_entry: attributes.logtag == 'F'
+          max_log_size: 1048576
+          output: handle_empty_log
+          source_identifier: attributes["log.file.path"]
+          type: recombine
+        - id: parser-docker
+          timestamp:
+            layout: '%Y-%m-%dT%H:%M:%S.%LZ'
+            parse_from: attributes.time
+          type: json_parser
+        - combine_field: attributes.log
+          combine_with: ""
+          id: docker-recombine
+          is_last_entry: attributes.log endsWith "\n"
+          max_log_size: 1048576
+          output: handle_empty_log
+          source_identifier: attributes["log.file.path"]
+          type: recombine
+        - field: attributes.log
+          id: handle_empty_log
+          if: attributes.log == nil
+          type: add
+          value: ""
+        - parse_from: attributes["log.file.path"]
+          regex: ^\/var\/log\/pods\/(?P<namespace>[^_]+)_(?P<pod_name>[^_]+)_(?P<uid>[^\/]+)\/(?P<container_name>[^\._]+)\/(?P<restart_count>\d+)\.log$
+          type: regex_parser
+        - from: attributes.uid
+          to: resource["k8s.pod.uid"]
+          type: move
+        - from: attributes.restart_count
+          to: resource["k8s.container.restart_count"]
+          type: move
+        - from: attributes.container_name
+          to: resource["k8s.container.name"]
+          type: move
+        - from: attributes.namespace
+          to: resource["k8s.namespace.name"]
+          type: move
+        - from: attributes.pod_name
+          to: resource["k8s.pod.name"]
+          type: move
+        - field: resource["com.splunk.sourcetype"]
+          type: add
+          value: EXPR("kube:container:"+resource["k8s.container.name"])
+        - from: attributes.stream
+          to: attributes["log.iostream"]
+          type: move
+        - from: attributes["log.file.path"]
+          to: resource["com.splunk.source"]
+          type: move
+        - from: attributes.log
+          id: clean-up-log-record
+          to: body
+          type: move
+        - field: attributes.time
+          type: remove
+        poll_interval: 200ms
+        retry_on_failure:
+          enabled: true
+        start_at: beginning
+        storage: file_storage
+      hostmetrics:
+        collection_interval: 10s
+        root_path: /hostfs
+        scrapers:
+          cpu: null
+          disk: null
+          filesystem:
+            include_mount_points:
+              match_type: strict
+              mount_points:
+              - /
+          load: null
+          memory: null
+          network: null
+          paging: null
+          processes: null
+      jaeger:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:14250
+          thrift_http:
+            endpoint: 0.0.0.0:14268
+      kubeletstats:
+        auth_type: serviceAccount
+        collection_interval: 10s
+        endpoint: ${K8S_NODE_IP}:10250
+        extra_metadata_labels:
+        - container.id
+        metric_groups:
+        - container
+        - pod
+        - node
+        metrics:
+          container.cpu.usage:
+            enabled: false
+          k8s.node.cpu.usage:
+            enabled: false
+          k8s.pod.cpu.usage:
+            enabled: false
+      nop: null
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+      prometheus/agent:
+        config:
+          scrape_configs:
+          - job_name: otel-agent
+            metric_relabel_configs:
+            - action: drop
+              regex: promhttp_metric_handler_errors.*
+              source_labels:
+              - __name__
+            - action: drop
+              regex: otelcol_processor_batch_.*
+              source_labels:
+              - __name__
+            scrape_interval: 10s
+            static_configs:
+            - targets:
+              - localhost:8889
+      receiver_creator:
+        receivers:
+          prometheus/coredns:
+            config:
+              config:
+                scrape_configs:
+                - job_name: coredns
+                  metric_relabel_configs:
+                  - action: keep
+                    regex: (coredns_dns_request_duration_seconds|coredns_cache_misses_total|coredns_cache_hits_total|coredns_cache_entries|coredns_dns_responses_total|coredns_dns_requests_total|rest_client_requests_total|rest_client_request_duration_seconds)(?:_sum|_count|_bucket)?
+                    source_labels:
+                    - __name__
+                  static_configs:
+                  - targets:
+                    - '`endpoint`:9153'
+            rule: type == "pod" && labels["k8s-app"] == "kube-dns"
+          prometheus/kube-controller-manager:
+            config:
+              config:
+                scrape_configs:
+                - authorization:
+                    credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+                    type: Bearer
+                  job_name: kube-controller-manager
+                  metric_relabel_configs:
+                  - action: keep
+                    regex: (workqueue_longest_running_processor_seconds|workqueue_unfinished_work_seconds|workqueue_depth|workqueue_retries_total|workqueue_queue_duration_seconds)(?:_sum|_count|_bucket)?
+                    source_labels:
+                    - __name__
+                  scheme: https
+                  static_configs:
+                  - targets:
+                    - '`endpoint`:10257'
+                  tls_config:
+                    ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                    insecure_skip_verify: true
+            rule: type == "pod" && (labels["k8s-app"] == "kube-controller-manager" ||
+              labels["component"] == "kube-controller-manager")
+          prometheus/kubernetes-apiserver:
+            config:
+              config:
+                scrape_configs:
+                - authorization:
+                    credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+                    type: Bearer
+                  job_name: kubernetes-apiserver
+                  metric_relabel_configs:
+                  - action: keep
+                    regex: (apiserver_longrunning_requests|apiserver_request_duration_seconds|apiserver_storage_objects|apiserver_response_sizes|apiserver_request_total|rest_client_requests_total|rest_client_request_duration_seconds)(?:_sum|_count|_bucket)?
+                    source_labels:
+                    - __name__
+                  scheme: https
+                  static_configs:
+                  - targets:
+                    - '`endpoint`'
+                  tls_config:
+                    ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                    insecure_skip_verify: true
+            rule: type == "port" && port == 443 && (pod.labels["k8s-app"] == "kube-apiserver"
+              || pod.labels["component"] == "kube-apiserver")
+          prometheus/kubernetes-proxy:
+            config:
+              config:
+                scrape_configs:
+                - job_name: kubernetes-proxy
+                  metric_relabel_configs:
+                  - action: keep
+                    regex: (kubeproxy_sync_proxy_rules_iptables_restore_failures_total|kubeproxy_sync_proxy_rules_service_changes_total|kubeproxy_sync_proxy_rules_service_changes_pending|kubeproxy_sync_proxy_rules_duration_seconds|kubeproxy_network_programming_duration_seconds)(?:_sum|_count|_bucket)?
+                    source_labels:
+                    - __name__
+                  static_configs:
+                  - targets:
+                    - '`endpoint`:10249'
+            rule: type == "pod" && labels["k8s-app"] == "kube-proxy"
+          prometheus/kubernetes-scheduler:
+            config:
+              config:
+                scrape_configs:
+                - authorization:
+                    credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+                    type: Bearer
+                  job_name: kubernetes-scheduler
+                  metric_relabel_configs:
+                  - action: keep
+                    regex: (rest_client_request_duration_seconds|rest_client_requests_total|scheduler_pending_pods|scheduler_schedule_attempts_total|scheduler_queue_incoming_pods_total|scheduler_preemption_attempts_total|scheduler_scheduling_algorithm_duration_seconds|scheduler_pod_scheduling_sli_duration_seconds)(?:_sum|_count|_bucket)?
+                    source_labels:
+                    - __name__
+                  scheme: https
+                  static_configs:
+                  - targets:
+                    - '`endpoint`:10259'
+                  tls_config:
+                    ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                    insecure_skip_verify: true
+            rule: type == "pod" && (labels["k8s-app"] == "kube-scheduler" || labels["component"]
+              == "kube-scheduler")
+        watch_observers:
+        - k8s_observer
+      zipkin:
+        endpoint: 0.0.0.0:9411
+    service:
+      extensions:
+      - file_storage
+      - health_check
+      - headers_setter
+      - k8s_observer
+      - zpages
+      pipelines:
+        logs:
+          exporters:
+          - splunk_hec/o11y
+          - splunk_hec/platform_logs
+          processors:
+          - memory_limiter
+          - k8sattributes
+          - filter/logs
+          - batch
+          - resourcedetection
+          - resource
+          - resource/logs
+          - resource/add_environment
+          receivers:
+          - filelog
+          - otlp
+        logs/entities:
+          exporters:
+          - otlphttp/entities
+          processors:
+          - memory_limiter
+          - batch
+          - resourcedetection
+          - resource
+          receivers:
+          - nop
+        metrics:
+          exporters:
+          - signalfx
+          processors:
+          - memory_limiter
+          - batch
+          - resourcedetection
+          - resource
+          receivers:
+          - hostmetrics
+          - kubeletstats
+          - otlp
+        metrics/agent:
+          exporters:
+          - signalfx
+          processors:
+          - memory_limiter
+          - batch
+          - resource/add_agent_k8s
+          - resourcedetection
+          - resource
+          - resource/add_mode
+          receivers:
+          - prometheus/agent
+        metrics/histograms:
+          exporters:
+          - signalfx/histograms
+          processors:
+          - memory_limiter
+          - batch
+          - resource/add_agent_k8s
+          - resourcedetection
+          - resource
+          receivers:
+          - receiver_creator
+        traces:
+          exporters:
+          - otlphttp
+          - signalfx
+          processors:
+          - memory_limiter
+          - k8sattributes
+          - batch
+          - resourcedetection
+          - resource
+          - resource/add_environment
+          receivers:
+          - otlp
+          - jaeger
+          - zipkin
+      telemetry:
+        metrics:
+          readers:
+          - pull:
+              exporter:
+                prometheus:
+                  host: localhost
+                  port: 8889
+                  without_scope_info: true
+                  without_type_suffix: true
+                  without_units: true
+        resource:
+          service.name: otel-agent
+  discovery.properties: |
+    splunk.discovery:
+      extensions:
+        docker_observer:
+          enabled: false
+        host_observer:
+          enabled: false
+      receivers: {}
+---
+# Source: splunk-otel-collector/templates/configmap-cluster-receiver.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: splunk-otel-collector-otel-k8s-cluster-receiver
+  namespace: default
+  labels:
+    app.kubernetes.io/name: splunk-otel-collector
+    helm.sh/chart: splunk-otel-collector-0.143.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/version: "0.143.0"
+    app: splunk-otel-collector
+    chart: splunk-otel-collector-0.143.0
+    release: splunk-otel-collector
+data:
+  relay: |
+    exporters:
+      signalfx:
+        access_token: ${SPLUNK_OBSERVABILITY_ACCESS_TOKEN}
+        api_url: https://api.us1.signalfx.com
+        disable_default_translation_rules: true
+        ingest_url: https://ingest.us1.signalfx.com
+        timeout: 10s
+      splunk_hec/platform_logs:
+        disable_compression: true
+        endpoint: https://http-inputs-acumuladoresmoura.splunkcloud.com:8088/services/collector
+        idle_conn_timeout: 10s
+        index: main
+        max_idle_conns: 200
+        max_idle_conns_per_host: 200
+        profiling_data_enabled: false
+        retry_on_failure:
+          enabled: true
+          initial_interval: 5s
+          max_elapsed_time: 300s
+          max_interval: 30s
+        sending_queue:
+          enabled: true
+          num_consumers: 10
+          queue_size: 1000
+        source: kubernetes
+        sourcetype: kube:events
+        splunk_app_name: splunk-otel-collector
+        splunk_app_version: 0.143.0
+        timeout: 10s
+        tls:
+          insecure_skip_verify: false
+        token: ${SPLUNK_PLATFORM_HEC_TOKEN}
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13134
+    processors:
+      attributes/drop_event_attrs:
+        actions:
+        - action: delete
+          key: k8s.event.start_time
+        - action: delete
+          key: k8s.event.name
+        - action: delete
+          key: k8s.event.uid
+      batch:
+        send_batch_max_size: 32768
+      memory_limiter:
+        check_interval: 2s
+        limit_mib: ${SPLUNK_MEMORY_LIMIT_MIB}
+      resource:
+        attributes:
+        - action: insert
+          key: metric_source
+          value: kubernetes
+        - action: upsert
+          key: k8s.cluster.name
+          value: greg-cluster
+      resource/add_collector_k8s:
+        attributes:
+        - action: insert
+          key: k8s.node.name
+          value: ${K8S_NODE_NAME}
+        - action: insert
+          key: k8s.pod.name
+          value: ${K8S_POD_NAME}
+        - action: insert
+          key: k8s.pod.uid
+          value: ${K8S_POD_UID}
+        - action: insert
+          key: k8s.namespace.name
+          value: ${K8S_NAMESPACE}
+      resource/add_environment:
+        attributes:
+        - action: insert
+          key: deployment.environment
+          value: lab
+      resource/add_mode:
+        attributes:
+        - action: insert
+          key: otelcol.service.mode
+          value: clusterReceiver
+      resource/k8s_cluster:
+        attributes:
+        - action: insert
+          key: receiver
+          value: k8scluster
+      resourcedetection:
+        detectors:
+        - env
+        - azure
+        - system
+        override: true
+        timeout: 15s
+      transform/add_sourcetype:
+        log_statements:
+        - context: log
+          statements:
+          - set(resource.attributes["com.splunk.sourcetype"], Concat(["kube:object:",
+            attributes["k8s.resource.name"]], ""))
+      transform/k8sevents:
+        error_mode: ignore
+        log_statements:
+        - conditions:
+          - resource.attributes["k8s.object.kind"] == "HorizontalPodAutoscaler"
+          statements:
+          - set(resource.attributes["k8s.hpa.name"], resource.attributes["k8s.object.name"])
+          - set(resource.attributes["k8s.hpa.uid"], resource.attributes["k8s.object.uid"])
+        - conditions:
+          - resource.attributes["k8s.object.kind"] != "HorizontalPodAutoscaler"
+          statements:
+          - set(resource.attributes[Concat(["k8s", ConvertCase(resource.attributes["k8s.object.kind"],
+            "lower"), "name"], ".")], resource.attributes["k8s.object.name"])
+          - set(resource.attributes[Concat(["k8s", ConvertCase(resource.attributes["k8s.object.kind"],
+            "lower"), "uid"], ".")], resource.attributes["k8s.object.uid"])
+        - conditions:
+          - resource.attributes["k8s.object.kind"] == "Pod" and IsMatch(resource.attributes["k8s.object.fieldpath"],
+            "spec\\.containers.*")
+          statements:
+          - merge_maps(resource.cache, ExtractPatterns(resource.attributes["k8s.object.fieldpath"],
+            "spec.containers\\{(?P<k8s_container_name>[^\\}]+)\\}"), "insert")
+          - set(resource.attributes["k8s.container.name"], resource.cache["k8s_container_name"])
+      transform/k8shpascaletargetref:
+        error_mode: ignore
+        metric_statements:
+        - context: resource
+          statements:
+          - set(attributes["k8s.replicaset.name"], resource.attributes["k8s.hpa.scaletargetref.name"])
+            where IsMatch(resource.attributes["k8s.hpa.scaletargetref.kind"], "ReplicaSet")
+          - set(attributes["k8s.statefulset.name"], resource.attributes["k8s.hpa.scaletargetref.name"])
+            where IsMatch(resource.attributes["k8s.hpa.scaletargetref.kind"], "StatefulSet")
+          - set(attributes["k8s.deployment.name"], resource.attributes["k8s.hpa.scaletargetref.name"])
+            where IsMatch(resource.attributes["k8s.hpa.scaletargetref.kind"], "Deployment")
+    receivers:
+      k8s_cluster:
+        auth_type: serviceAccount
+        metadata_exporters:
+        - signalfx
+        metrics:
+          k8s.container.status.reason:
+            enabled: true
+          k8s.node.condition:
+            enabled: true
+          k8s.pod.status_reason:
+            enabled: true
+        resource_attributes:
+          k8s.hpa.scaletargetref.kind:
+            enabled: true
+          k8s.hpa.scaletargetref.name:
+            enabled: true
+          k8s.kubelet.version:
+            enabled: true
+          k8s.pod.qos_class:
+            enabled: true
+      k8s_events:
+        auth_type: serviceAccount
+      k8sobjects:
+        auth_type: serviceAccount
+        objects:
+        - interval: 6h
+          mode: pull
+          name: pods
+      prometheus/k8s_cluster_receiver:
+        config:
+          scrape_configs:
+          - job_name: otel-k8s-cluster-receiver
+            metric_relabel_configs:
+            - action: drop
+              regex: promhttp_metric_handler_errors.*
+              source_labels:
+              - __name__
+            - action: drop
+              regex: otelcol_processor_batch_.*
+              source_labels:
+              - __name__
+            scrape_interval: 10s
+            static_configs:
+            - targets:
+              - localhost:8899
+    service:
+      extensions:
+      - health_check
+      pipelines:
+        logs:
+          exporters:
+          - splunk_hec/platform_logs
+          processors:
+          - memory_limiter
+          - batch
+          - attributes/drop_event_attrs
+          - resourcedetection
+          - resource
+          - resource/add_environment
+          - transform/k8sevents
+          receivers:
+          - k8s_events
+        logs/objects:
+          exporters:
+          - splunk_hec/platform_logs
+          processors:
+          - memory_limiter
+          - batch
+          - resourcedetection
+          - resource
+          - transform/add_sourcetype
+          - resource/add_environment
+          receivers:
+          - k8sobjects
+        metrics:
+          exporters:
+          - signalfx
+          processors:
+          - memory_limiter
+          - batch
+          - transform/k8shpascaletargetref
+          - resource
+          - resource/k8s_cluster
+          receivers:
+          - k8s_cluster
+        metrics/collector:
+          exporters:
+          - signalfx
+          processors:
+          - memory_limiter
+          - batch
+          - resource/add_collector_k8s
+          - resourcedetection
+          - resource
+          - resource/add_mode
+          receivers:
+          - prometheus/k8s_cluster_receiver
+      telemetry:
+        metrics:
+          readers:
+          - pull:
+              exporter:
+                prometheus:
+                  host: localhost
+                  port: 8899
+                  without_scope_info: true
+                  without_type_suffix: true
+                  without_units: true
+        resource:
+          service.name: otel-k8s-cluster-receiver
+---
+# Source: splunk-otel-collector/charts/operator/templates/clusterrole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    helm.sh/chart: operator-0.95.3
+    app.kubernetes.io/name: operator
+    app.kubernetes.io/version: "0.134.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: opentelemetry-operator
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/component: controller-manager
+  name: splunk-otel-collector-operator-manager
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - persistentvolumeclaims
+      - persistentvolumes
+      - pods
+      - serviceaccounts
+      - services
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - get
+      - list
+      - patch
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+    verbs:
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces/status
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - nodes/spec
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - pods/status
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - replicationcontrollers
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - replicationcontrollers/status
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - resourcequotas
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - daemonsets
+      - deployments
+      - statefulsets
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - apps
+      - extensions
+    resources:
+      - replicasets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+    resources:
+      - daemonsets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+    resources:
+      - deployments
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - autoscaling
+    resources:
+      - horizontalpodautoscalers
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - batch
+    resources:
+      - cronjobs
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - nodes/proxy
+    verbs:
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - nodes/stats
+    verbs:
+      - get
+  - apiGroups:
+      - config.openshift.io
+    resources:
+      - infrastructures
+      - infrastructures/status
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - create
+      - get
+      - list
+      - update
+  - apiGroups:
+      - events.k8s.io
+    resources:
+      - events
+    verbs:
+      - list
+      - watch
+  - apiGroups:
+      - monitoring.coreos.com
+    resources:
+      - podmonitors
+      - servicemonitors
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingresses
+      - networkpolicies
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - opentelemetry.io
+    resources:
+      - instrumentations
+    verbs:
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - opentelemetry.io
+    resources:
+      - opampbridges
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - opentelemetry.io
+    resources:
+      - opampbridges/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - opentelemetry.io
+    resources:
+      - opampbridges/status
+    verbs:
+      - get
+      - patch
+      - update
+  - apiGroups:
+      - opentelemetry.io
+    resources:
+      - opentelemetrycollectors
+    verbs:
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - opentelemetry.io
+    resources:
+      - opentelemetrycollectors/finalizers
+    verbs:
+      - get
+      - patch
+      - update
+  - apiGroups:
+      - opentelemetry.io
+    resources:
+      - opentelemetrycollectors/status
+    verbs:
+      - get
+      - patch
+      - update
+  - apiGroups:
+      - policy
+    resources:
+      - poddisruptionbudgets
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - route.openshift.io
+    resources:
+      - routes
+      - routes/custom-host
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+    - opentelemetry.io
+    resources:
+      - targetallocators
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+    - opentelemetry.io
+    resources:
+    - targetallocators/status
+    verbs:
+    - get
+    - patch
+    - update
+  - apiGroups:
+      - cert-manager.io
+    resources:
+      - issuers
+      - certificaterequests
+      - certificates
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - authorization.k8s.io
+    resources:
+      - subjectaccessreviews
+    verbs:
+      - create
+---
+# Source: splunk-otel-collector/charts/operator/templates/clusterrole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    helm.sh/chart: operator-0.95.3
+    app.kubernetes.io/name: operator
+    app.kubernetes.io/version: "0.134.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: opentelemetry-operator
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/component: controller-manager
+  name: splunk-otel-collector-operator-metrics
+rules:
+  - nonResourceURLs:
+      - /metrics
+    verbs:
+      - get
+---
+# Source: splunk-otel-collector/charts/operator/templates/clusterrole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    helm.sh/chart: operator-0.95.3
+    app.kubernetes.io/name: operator
+    app.kubernetes.io/version: "0.134.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: opentelemetry-operator
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/component: controller-manager
+  name: splunk-otel-collector-operator-proxy
+rules:
+  - apiGroups:
+      - authentication.k8s.io
+    resources:
+      - tokenreviews
+    verbs:
+      - create
+---
+# Source: splunk-otel-collector/templates/clusterRole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: splunk-otel-collector
+  labels:
+    app.kubernetes.io/name: splunk-otel-collector
+    helm.sh/chart: splunk-otel-collector-0.143.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/version: "0.143.0"
+    app: splunk-otel-collector
+    chart: splunk-otel-collector-0.143.0
+    release: splunk-otel-collector
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  - namespaces
+  - namespaces/status
+  - nodes
+  - nodes/spec
+  - nodes/stats
+  - nodes/proxy
+  - pods
+  - pods/status
+  - persistentvolumeclaims
+  - persistentvolumes
+  - replicationcontrollers
+  - replicationcontrollers/status
+  - resourcequotas
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  - deployments
+  - replicasets
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - extensions
+  resources:
+  - daemonsets
+  - deployments
+  - replicasets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  - cronjobs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+    - autoscaling
+  resources:
+    - horizontalpodautoscalers
+  verbs:
+    - get
+    - list
+    - watch
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - events.k8s.io
+  resources:
+  - events
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+---
+# Source: splunk-otel-collector/charts/operator/templates/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    helm.sh/chart: operator-0.95.3
+    app.kubernetes.io/name: operator
+    app.kubernetes.io/version: "0.134.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: opentelemetry-operator
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/component: controller-manager
+  name: splunk-otel-collector-operator-manager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: splunk-otel-collector-operator-manager
+subjects:
+  - kind: ServiceAccount
+    name: operator
+    namespace: default
+---
+# Source: splunk-otel-collector/charts/operator/templates/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    helm.sh/chart: operator-0.95.3
+    app.kubernetes.io/name: operator
+    app.kubernetes.io/version: "0.134.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: opentelemetry-operator
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/component: controller-manager
+  name: splunk-otel-collector-operator-proxy
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: splunk-otel-collector-operator-proxy
+subjects:
+  - kind: ServiceAccount
+    name: operator
+    namespace: default
+---
+# Source: splunk-otel-collector/templates/clusterRoleBinding.yaml
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: splunk-otel-collector
+  labels:
+    app.kubernetes.io/name: splunk-otel-collector
+    helm.sh/chart: splunk-otel-collector-0.143.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/version: "0.143.0"
+    app: splunk-otel-collector
+    chart: splunk-otel-collector-0.143.0
+    release: splunk-otel-collector
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: splunk-otel-collector
+subjects:
+- kind: ServiceAccount
+  name: splunk-otel-collector
+  namespace: default
+---
+# Source: splunk-otel-collector/charts/operator/templates/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    helm.sh/chart: operator-0.95.3
+    app.kubernetes.io/name: operator
+    app.kubernetes.io/version: "0.134.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: opentelemetry-operator
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/component: controller-manager
+  name: splunk-otel-collector-operator-leader-election
+  namespace: default
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - pods
+      - serviceaccounts
+      - services
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - daemonsets
+      - deployments
+      - statefulsets
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - replicasets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - autoscaling
+    resources:
+      - horizontalpodautoscalers
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - config.openshift.io
+    resources:
+      - infrastructures
+      - infrastructures/status
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - create
+      - get
+      - list
+      - update
+  - apiGroups:
+      - monitoring.coreos.com
+    resources:
+      - podmonitors
+      - servicemonitors
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingresses
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - opentelemetry.io
+    resources:
+      - instrumentations
+      - opentelemetrycollectors
+    verbs:
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - opentelemetry.io
+    resources:
+      - opampbridges
+      - targetallocators
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - opentelemetry.io
+    resources:
+      - opampbridges/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - opentelemetry.io
+    resources:
+      - opampbridges/status
+      - opentelemetrycollectors/finalizers
+      - opentelemetrycollectors/status
+      - targetallocators/status
+    verbs:
+      - get
+      - patch
+      - update
+  - apiGroups:
+      - policy
+    resources:
+      - poddisruptionbudgets
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - route.openshift.io
+    resources:
+      - routes
+      - routes/custom-host
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+---
+# Source: splunk-otel-collector/charts/operator/templates/rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    helm.sh/chart: operator-0.95.3
+    app.kubernetes.io/name: operator
+    app.kubernetes.io/version: "0.134.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: opentelemetry-operator
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/component: controller-manager
+  name: splunk-otel-collector-operator-leader-election
+  namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: splunk-otel-collector-operator-leader-election
+subjects:
+  - kind: ServiceAccount
+    name: operator
+    namespace: default
+---
+# Source: splunk-otel-collector/charts/operator/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    helm.sh/chart: operator-0.95.3
+    app.kubernetes.io/name: operator
+    app.kubernetes.io/version: "0.134.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: opentelemetry-operator
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/component: controller-manager
+  name: splunk-otel-collector-operator
+  namespace: default
+spec:
+  ports:
+    - name: https
+      port: 8443
+      protocol: TCP
+      targetPort: https
+    - name: metrics
+      port: 8080
+      protocol: TCP
+      targetPort: metrics
+  selector:
+      app.kubernetes.io/name: operator
+      app.kubernetes.io/component: controller-manager
+---
+# Source: splunk-otel-collector/charts/operator/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    helm.sh/chart: operator-0.95.3
+    app.kubernetes.io/name: operator
+    app.kubernetes.io/version: "0.134.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: opentelemetry-operator
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/component: controller-manager
+  name: splunk-otel-collector-operator-webhook
+  namespace: default
+spec:
+  ports:
+    - port: 443
+      protocol: TCP
+      targetPort: webhook-server
+  selector:
+      app.kubernetes.io/name: operator
+      app.kubernetes.io/component: controller-manager
+---
+# Source: splunk-otel-collector/templates/service-agent.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: splunk-otel-collector-agent
+  namespace: default
+  labels:
+    app.kubernetes.io/name: splunk-otel-collector
+    helm.sh/chart: splunk-otel-collector-0.143.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/version: "0.143.0"
+    app: splunk-otel-collector
+    component: otel-collector-agent
+    chart: splunk-otel-collector-0.143.0
+    release: splunk-otel-collector
+    app.kubernetes.io/component: otel-collector-agent
+spec:
+  type: ClusterIP
+  ports:
+  - name: jaeger-grpc
+    port: 14250
+    targetPort: jaeger-grpc
+    protocol: TCP
+  - name: jaeger-thrift
+    port: 14268
+    targetPort: jaeger-thrift
+    protocol: TCP
+  - name: otlp
+    port: 4317
+    targetPort: otlp
+    protocol: TCP
+  - name: otlp-http
+    port: 4318
+    targetPort: otlp-http
+    protocol: TCP
+  - name: zipkin
+    port: 9411
+    targetPort: zipkin
+    protocol: TCP
+  selector:
+    app: splunk-otel-collector
+    component: otel-collector-agent
+    release: splunk-otel-collector
+  internalTrafficPolicy: Local
+---
+# Source: splunk-otel-collector/templates/daemonset.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: splunk-otel-collector-agent
+  namespace: default
+  labels:
+    app.kubernetes.io/name: splunk-otel-collector
+    helm.sh/chart: splunk-otel-collector-0.143.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/version: "0.143.0"
+    app: splunk-otel-collector
+    component: otel-collector-agent
+    chart: splunk-otel-collector-0.143.0
+    release: splunk-otel-collector
+spec:
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: splunk-otel-collector
+      release: splunk-otel-collector
+  template:
+    metadata:
+      labels:
+        app: splunk-otel-collector
+        component: otel-collector-agent
+        release: splunk-otel-collector
+      annotations:
+        checksum/config: 6e6d15be68f7aaaee1e876a5f029114c671329ab06203a6fce50222ce53dd79f
+        kubectl.kubernetes.io/default-container: otel-collector
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      serviceAccountName: splunk-otel-collector
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+          operator: Exists
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/control-plane
+          operator: Exists
+        - effect: NoSchedule
+          key: kubernetes.io/system-node
+          operator: Exists
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/infra
+          operator: Exists
+      initContainers:
+      containers:
+      - name: otel-collector
+        args:
+        - --config=/conf/relay.yaml
+        - --discovery
+        ports:
+        - name: jaeger-grpc
+          containerPort: 14250
+          hostPort: 14250
+          protocol: TCP
+        - name: jaeger-thrift
+          containerPort: 14268
+          hostPort: 14268
+          protocol: TCP
+        - name: otlp
+          containerPort: 4317
+          hostPort: 4317
+          protocol: TCP
+        - name: otlp-http
+          containerPort: 4318
+          hostPort: 4318
+          protocol: TCP
+        - name: zipkin
+          containerPort: 9411
+          hostPort: 9411
+          protocol: TCP
+        image: quay.io/signalfx/splunk-otel-collector:0.143.0
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          runAsUser: 0
+        env:
+          - name: SPLUNK_MEMORY_TOTAL_MIB
+            valueFrom:
+              resourceFieldRef:
+                resource: limits.memory
+                divisor: "1Mi"
+          - name: K8S_NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: K8S_NODE_IP
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: status.hostIP
+          - name: K8S_POD_IP
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: status.podIP
+          - name: K8S_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: K8S_POD_UID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.uid
+          - name: K8S_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: SPLUNK_OBSERVABILITY_ACCESS_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: splunk-otel-collector
+                key: splunk_observability_access_token
+          - name: SPLUNK_PLATFORM_HEC_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: splunk-otel-collector
+                key: splunk_platform_hec_token
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 13133
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 13133
+        resources:
+          limits:
+            cpu: 200m
+            memory: 500Mi
+        volumeMounts:
+        - mountPath: /conf
+          name: otel-configmap
+        - mountPath: /etc/otel/collector/config.d
+          name: otel-discovery-properties-configmap
+        - mountPath: /hostfs/dev
+          name: host-dev
+          readOnly: true
+        - mountPath: /hostfs/etc
+          name: host-etc
+          readOnly: true
+        - mountPath: /hostfs/proc
+          name: host-proc
+          readOnly: true
+        - mountPath: /hostfs/run/udev/data
+          name: host-run-udev-data
+          readOnly: true
+        - mountPath: /hostfs/sys
+          name: host-sys
+          readOnly: true
+        - mountPath: /hostfs/var/run/utmp
+          name: host-var-run-utmp
+          readOnly: true
+        - mountPath: /hostfs/usr/lib/os-release
+          name: host-usr-lib-osrelease
+          readOnly: true
+        - name: varlog
+          mountPath: /var/log
+          readOnly: true
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        - name: checkpoint
+          mountPath: /var/addon/splunk/otel_pos
+        - mountPath: /usr/lib/splunk-otel-collector/agent-bundle/run/collectd
+          name: run-collectd
+          readOnly: false
+      terminationGracePeriodSeconds: 600
+      volumes:
+      - name: run-collectd
+        emptyDir:
+          sizeLimit: 25Mi
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      - name: checkpoint
+        hostPath:
+          path: /var/addon/splunk/otel_pos
+          type: DirectoryOrCreate
+      - name: host-dev
+        hostPath:
+          path: /dev
+      - name: host-etc
+        hostPath:
+          path: /etc
+      - name: host-proc
+        hostPath:
+          path: /proc
+      - name: host-run-udev-data
+        hostPath:
+          path: /run/udev/data
+      - name: host-sys
+        hostPath:
+          path: /sys
+      - name: host-var-run-utmp
+        hostPath:
+          path: /var/run/utmp
+      - name: host-usr-lib-osrelease
+        hostPath:
+          path: /usr/lib/os-release
+      - name: otel-configmap
+        configMap:
+          name: splunk-otel-collector-otel-agent
+          items:
+            - key: relay
+              path: relay.yaml
+      - name: otel-discovery-properties-configmap
+        configMap:
+          name: splunk-otel-collector-otel-agent
+          items:
+            - key: discovery.properties
+              path: properties.discovery.yaml
+---
+# Source: splunk-otel-collector/charts/operator/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    helm.sh/chart: operator-0.95.3
+    app.kubernetes.io/name: operator
+    app.kubernetes.io/version: "0.134.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: opentelemetry-operator
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/component: controller-manager
+  name: splunk-otel-collector-operator
+  namespace: default
+spec:
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: operator
+      app.kubernetes.io/component: controller-manager
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        helm.sh/chart: operator-0.95.3
+        app.kubernetes.io/name: operator
+        app.kubernetes.io/version: "0.134.0"
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/part-of: opentelemetry-operator
+        app.kubernetes.io/instance: splunk-otel-collector
+        app.kubernetes.io/component: controller-manager
+    spec:
+      automountServiceAccountToken: true
+      hostNetwork: false
+      containers:
+        - args:
+            - --metrics-addr=0.0.0.0:8080
+            - --enable-leader-election
+            - --health-probe-addr=:8081
+            - --webhook-port=9443
+            - --collector-image=ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s:0.134.1
+            - --ignore-missing-collector-crds=true
+          command:
+            - /manager
+          env:
+            - name: SERVICE_ACCOUNT_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.serviceAccountName
+            - name: ENABLE_WEBHOOKS
+              value: "true"
+          image: "ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator:0.134.0"
+          name: manager
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: metrics
+              protocol: TCP
+            - containerPort: 9443
+              name: webhook-server
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources: 
+            {}
+          volumeMounts:
+            - mountPath: /tmp/k8s-webhook-server/serving-certs
+              name: cert
+              readOnly: true
+          securityContext: 
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+        
+        - args:
+            - --secure-listen-address=0.0.0.0:8443
+            - --upstream=http://127.0.0.1:8080/
+            - --v=0
+          image: "quay.io/brancz/kube-rbac-proxy:v0.19.1"
+          name: kube-rbac-proxy
+          ports:
+            - containerPort: 8443
+              name: https
+              protocol: TCP
+          securityContext: 
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+      nodeSelector: 
+        kubernetes.io/os: linux
+      serviceAccountName: operator
+      terminationGracePeriodSeconds: 10
+      volumes:
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: splunk-otel-collector-operator-controller-manager-service-cert
+      securityContext:
+        fsGroup: 65532
+        runAsGroup: 65532
+        runAsNonRoot: true
+        runAsUser: 65532
+---
+# Source: splunk-otel-collector/templates/deployment-cluster-receiver.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: splunk-otel-collector-k8s-cluster-receiver
+  namespace: default
+  labels:
+    app.kubernetes.io/name: splunk-otel-collector
+    helm.sh/chart: splunk-otel-collector-0.143.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/version: "0.143.0"
+    app: splunk-otel-collector
+    component: otel-k8s-cluster-receiver
+    chart: splunk-otel-collector-0.143.0
+    release: splunk-otel-collector
+    app.kubernetes.io/component: otel-k8s-cluster-receiver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: splunk-otel-collector
+      component: otel-k8s-cluster-receiver
+      release: splunk-otel-collector
+  template:
+    metadata:
+      labels:
+        app: splunk-otel-collector
+        component: otel-k8s-cluster-receiver
+        release: splunk-otel-collector
+      annotations:
+        checksum/config: 3bf4ca724dbea5de472a5b6cb30df46408b45a1a96169690661d1feacba49766
+    spec:
+      serviceAccountName: splunk-otel-collector
+      nodeSelector:
+          kubernetes.io/os: linux
+      containers:
+      - name: otel-collector
+        args:
+        - --config=/conf/relay.yaml
+        image: quay.io/signalfx/splunk-otel-collector:0.143.0
+        imagePullPolicy: IfNotPresent
+        env:
+          - name: SPLUNK_MEMORY_TOTAL_MIB
+            valueFrom:
+              resourceFieldRef:
+                resource: limits.memory
+                divisor: "1Mi"
+          - name: K8S_NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: K8S_POD_IP
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: status.podIP
+          - name: K8S_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: K8S_POD_UID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.uid
+          - name: K8S_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: SPLUNK_OBSERVABILITY_ACCESS_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: splunk-otel-collector
+                key: splunk_observability_access_token
+          - name: SPLUNK_PLATFORM_HEC_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: splunk-otel-collector
+                key: splunk_platform_hec_token
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 13134
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 13134
+        resources:
+          limits:
+            cpu: 200m
+            memory: 500Mi
+        volumeMounts:
+        - mountPath: /conf
+          name: collector-configmap
+        - mountPath: /usr/lib/splunk-otel-collector/agent-bundle/run/collectd
+          name: run-collectd
+          readOnly: false
+      terminationGracePeriodSeconds: 600
+      volumes:
+      - name: collector-configmap
+        configMap:
+          name: splunk-otel-collector-otel-k8s-cluster-receiver
+          items:
+            - key: relay
+              path: relay.yaml
+      - name: run-collectd
+        emptyDir:
+          sizeLimit: 25Mi
+---
+# Source: splunk-otel-collector/charts/operator/templates/admission-webhooks/operator-webhook.yaml
+---
+---
+# Source: splunk-otel-collector/charts/operator/templates/admission-webhooks/operator-webhook.yaml
+---
+---
+# Source: splunk-otel-collector/templates/operator/instrumentation.yaml
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: splunk-otel-collector
+  namespace: default
+  labels:
+    app.kubernetes.io/name: splunk-otel-collector
+    helm.sh/chart: splunk-otel-collector-0.143.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/version: "0.143.0"
+    app: splunk-otel-collector
+    component: otel-operator
+    chart: splunk-otel-collector-0.143.0
+    release: splunk-otel-collector
+    app.kubernetes.io/component: otel-operator
+spec:
+  exporter:
+    endpoint: http://splunk-otel-collector-agent.default.svc.cluster.local:4317
+  propagators:
+    - tracecontext
+    - baggage
+    - b3
+  env:
+    - name: SPLUNK_PROFILER_ENABLED
+      value: "true"
+    - name: SPLUNK_PROFILER_MEMORY_ENABLED
+      value: "true"
+  apacheHttpd:
+    env:
+    - name: OTEL_RESOURCE_ATTRIBUTES
+      value: splunk.zc.method=autoinstrumentation-apache-httpd:1.0.4
+    image: ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-apache-httpd:1.0.4
+  dotnet:
+    env:
+    - name: OTEL_DOTNET_AUTO_PLUGINS
+      value: Splunk.OpenTelemetry.AutoInstrumentation.Plugin,Splunk.OpenTelemetry.AutoInstrumentation
+    - name: OTEL_DOTNET_AUTO_CONTAINER_RESOURCE_DETECTOR_ENABLED
+      value: "true"
+    - name: OTEL_DOTNET_AUTO_RESOURCE_DETECTOR_ENABLED
+      value: "false"
+    - name: OTEL_RESOURCE_ATTRIBUTES
+      value: splunk.zc.method=splunk-otel-dotnet:v1.11.0
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: http://splunk-otel-collector-agent.default.svc.cluster.local:4318
+    image: ghcr.io/signalfx/splunk-otel-dotnet/splunk-otel-dotnet:v1.11.0
+  go:
+    env:
+    - name: OTEL_RESOURCE_ATTRIBUTES
+      value: splunk.zc.method=autoinstrumentation-go:v0.22.1
+    image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.22.1
+  java:
+    env:
+    - name: OTEL_RESOURCE_DISABLED_KEYS
+      value: process.executable.path,process.command_args
+    - name: OTEL_JAVA_ENABLED_RESOURCE_PROVIDERS
+      value: io.opentelemetry.instrumentation.resources.ContainerResourceProvider,io.opentelemetry.sdk.autoconfigure.EnvironmentResourceProvider,io.opentelemetry.instrumentation.resources.ProcessResourceProvider
+    - name: OTEL_RESOURCE_ATTRIBUTES
+      value: splunk.zc.method=splunk-otel-java:v2.20.1
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: http://splunk-otel-collector-agent.default.svc.cluster.local:4318
+    image: ghcr.io/signalfx/splunk-otel-java/splunk-otel-java:v2.20.1
+  nginx:
+    env:
+    - name: OTEL_RESOURCE_ATTRIBUTES
+      value: splunk.zc.method=autoinstrumentation-apache-httpd:1.0.4
+    image: ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-apache-httpd:1.0.4
+  nodejs:
+    env:
+    - name: OTEL_RESOURCE_ATTRIBUTES
+      value: splunk.zc.method=splunk-otel-js:v3.3.0
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: http://splunk-otel-collector-agent.default.svc.cluster.local:4318
+    image: ghcr.io/signalfx/splunk-otel-js/splunk-otel-js:v3.3.0
+  python:
+    env:
+    - name: OTEL_EXPERIMENTAL_RESOURCE_DETECTORS
+      value: ""
+    - name: OTEL_RESOURCE_ATTRIBUTES
+      value: splunk.zc.method=splunk-otel-instrumentation-python:v2.7.0
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: http://splunk-otel-collector-agent.default.svc.cluster.local:4318
+    image: quay.io/signalfx/splunk-otel-instrumentation-python:v2.7.0
+---
+# Source: splunk-otel-collector/charts/operator/templates/admission-webhooks/operator-webhook.yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  labels:
+    helm.sh/chart: operator-0.95.3
+    app.kubernetes.io/name: operator
+    app.kubernetes.io/version: "0.134.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: opentelemetry-operator
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/component: webhook
+  name: splunk-otel-collector-operator-mutation
+webhooks:
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURSVENDQWkyZ0F3SUJBZ0lRVEh0VWRLSlVMNWtXZVQzTWdDOEVmVEFOQmdrcWhraUc5dzBCQVFzRkFEQXQKTVNzd0tRWURWUVFERXlKdmNHVnVkR1ZzWlcxbGRISjVMVzl3WlhKaGRHOXlMVzl3WlhKaGRHOXlMV05oTUI0WApEVEkyTURFeU56RTRORFUxTWxvWERUTTJNREV5TlRFNE5EVTFNbG93TFRFck1Da0dBMVVFQXhNaWIzQmxiblJsCmJHVnRaWFJ5ZVMxdmNHVnlZWFJ2Y2kxdmNHVnlZWFJ2Y2kxallUQ0NBU0l3RFFZSktvWklodmNOQVFFQkJRQUQKZ2dFUEFEQ0NBUW9DZ2dFQkFMck02TDVRbkxUckhrYnlROGlZeUhXQkF5UVJIZWl6SzlCdmJFQXl2MmtEck55egpRZFRQblFZemR5K3V5cTRSb3ZFWEdLajR3NVBlWjhBREUrdHZBNEdXR2ovNlIzS3cyejhrZStuV3RzYTVFbjI0CkZOZE8rbmd3RUVFSlFqcllwRzAxUDc2RGVUNkJpRkk2NVZ6WnVHS1BQSmk5VVozemtRZytJb2NNdy9RZ3JyL3IKNCswNnlRRWYvMDBaZjNvOUtZd1ltM3Y1WTV6dEJyS2VIOFVWa3B0ZTVmdXY1OS9QT0RpcDNXaW54VG9RcDJ4WQplR0ZVcW5SN0FzTSt1aVRGZWFLK0NvRjJIMFYzbWZlWTlsdlVMOGd3VmhoU1hmUG4xR092bGJEK3FkYkhvTFVWCkZqVExjRzBTenNoTTZZOGhIN3MzRHJ6RzdVd1pkRHVQdWpsNDkwc0NBd0VBQWFOaE1GOHdEZ1lEVlIwUEFRSC8KQkFRREFnS2tNQjBHQTFVZEpRUVdNQlFHQ0NzR0FRVUZCd01CQmdnckJnRUZCUWNEQWpBUEJnTlZIUk1CQWY4RQpCVEFEQVFIL01CMEdBMVVkRGdRV0JCUVE5eTQrRlB6bFNDK1VaZUgreGZNbWZ0dnBwekFOQmdrcWhraUc5dzBCCkFRc0ZBQU9DQVFFQWk0bW9RSTVCdTRORWpKVHlnbjBPYUNLUjQ1NzVJUitVdUYwS3NiSVdVcHU1bTFQOEFoYXoKY1JzZzRRZ1VkMk1Uc0dVWXNZaG5INnlkd0dTV1J2TGNjNnUxMVc3bnNsMVA4VkpxczFQK1M3UEdHRkl3K3dZdwpjNFUzekRpYUR3ZTBOd3g2ams2RFMrVEJtWllMR2NJeGFSZXhqQTRteE0wcVN0WXg0WWZVOFF0RitkWUozR29iCnBmWDcrUmJTckxCZGVGRi9scG9RcFhuNGQrQzhPSVV1R2lheUxSeENROTFSbVRKOTRoeFlwZGcxeG9Pd3N2OU8KclNvanFrSTJHdW9lSlE2OVRhZll3SVg1YTFtY24xZmRrOW5MZGNGejFmVGdaeVg5bzQ2blVzQzN2SngxWHN3dwpFbzlKWW5zZVU3TUt3SmIzOTB0MUpJZ0ZDOVBpZVViUWtRPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+      service:
+        name: splunk-otel-collector-operator-webhook
+        namespace: default
+        path: /mutate-opentelemetry-io-v1alpha1-instrumentation
+        port: 443
+    failurePolicy: Fail
+    name: minstrumentation.kb.io
+    rules:
+    - apiGroups:
+        - opentelemetry.io
+      apiVersions:
+        - v1alpha1
+      operations:
+        - CREATE
+        - UPDATE
+      resources:
+        - instrumentations
+      scope: Namespaced
+    sideEffects: None
+    timeoutSeconds: 10
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURSVENDQWkyZ0F3SUJBZ0lRVEh0VWRLSlVMNWtXZVQzTWdDOEVmVEFOQmdrcWhraUc5dzBCQVFzRkFEQXQKTVNzd0tRWURWUVFERXlKdmNHVnVkR1ZzWlcxbGRISjVMVzl3WlhKaGRHOXlMVzl3WlhKaGRHOXlMV05oTUI0WApEVEkyTURFeU56RTRORFUxTWxvWERUTTJNREV5TlRFNE5EVTFNbG93TFRFck1Da0dBMVVFQXhNaWIzQmxiblJsCmJHVnRaWFJ5ZVMxdmNHVnlZWFJ2Y2kxdmNHVnlZWFJ2Y2kxallUQ0NBU0l3RFFZSktvWklodmNOQVFFQkJRQUQKZ2dFUEFEQ0NBUW9DZ2dFQkFMck02TDVRbkxUckhrYnlROGlZeUhXQkF5UVJIZWl6SzlCdmJFQXl2MmtEck55egpRZFRQblFZemR5K3V5cTRSb3ZFWEdLajR3NVBlWjhBREUrdHZBNEdXR2ovNlIzS3cyejhrZStuV3RzYTVFbjI0CkZOZE8rbmd3RUVFSlFqcllwRzAxUDc2RGVUNkJpRkk2NVZ6WnVHS1BQSmk5VVozemtRZytJb2NNdy9RZ3JyL3IKNCswNnlRRWYvMDBaZjNvOUtZd1ltM3Y1WTV6dEJyS2VIOFVWa3B0ZTVmdXY1OS9QT0RpcDNXaW54VG9RcDJ4WQplR0ZVcW5SN0FzTSt1aVRGZWFLK0NvRjJIMFYzbWZlWTlsdlVMOGd3VmhoU1hmUG4xR092bGJEK3FkYkhvTFVWCkZqVExjRzBTenNoTTZZOGhIN3MzRHJ6RzdVd1pkRHVQdWpsNDkwc0NBd0VBQWFOaE1GOHdEZ1lEVlIwUEFRSC8KQkFRREFnS2tNQjBHQTFVZEpRUVdNQlFHQ0NzR0FRVUZCd01CQmdnckJnRUZCUWNEQWpBUEJnTlZIUk1CQWY4RQpCVEFEQVFIL01CMEdBMVVkRGdRV0JCUVE5eTQrRlB6bFNDK1VaZUgreGZNbWZ0dnBwekFOQmdrcWhraUc5dzBCCkFRc0ZBQU9DQVFFQWk0bW9RSTVCdTRORWpKVHlnbjBPYUNLUjQ1NzVJUitVdUYwS3NiSVdVcHU1bTFQOEFoYXoKY1JzZzRRZ1VkMk1Uc0dVWXNZaG5INnlkd0dTV1J2TGNjNnUxMVc3bnNsMVA4VkpxczFQK1M3UEdHRkl3K3dZdwpjNFUzekRpYUR3ZTBOd3g2ams2RFMrVEJtWllMR2NJeGFSZXhqQTRteE0wcVN0WXg0WWZVOFF0RitkWUozR29iCnBmWDcrUmJTckxCZGVGRi9scG9RcFhuNGQrQzhPSVV1R2lheUxSeENROTFSbVRKOTRoeFlwZGcxeG9Pd3N2OU8KclNvanFrSTJHdW9lSlE2OVRhZll3SVg1YTFtY24xZmRrOW5MZGNGejFmVGdaeVg5bzQ2blVzQzN2SngxWHN3dwpFbzlKWW5zZVU3TUt3SmIzOTB0MUpJZ0ZDOVBpZVViUWtRPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+      service:
+        name: splunk-otel-collector-operator-webhook
+        namespace: default
+        path: /mutate-opentelemetry-io-v1beta1-opentelemetrycollector
+        port: 443
+    failurePolicy: Fail
+    name: mopentelemetrycollectorbeta.kb.io
+    rules:
+      - apiGroups:
+          - opentelemetry.io
+        apiVersions:
+          - v1beta1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - opentelemetrycollectors
+        scope: Namespaced
+    sideEffects: None
+    timeoutSeconds: 10
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURSVENDQWkyZ0F3SUJBZ0lRVEh0VWRLSlVMNWtXZVQzTWdDOEVmVEFOQmdrcWhraUc5dzBCQVFzRkFEQXQKTVNzd0tRWURWUVFERXlKdmNHVnVkR1ZzWlcxbGRISjVMVzl3WlhKaGRHOXlMVzl3WlhKaGRHOXlMV05oTUI0WApEVEkyTURFeU56RTRORFUxTWxvWERUTTJNREV5TlRFNE5EVTFNbG93TFRFck1Da0dBMVVFQXhNaWIzQmxiblJsCmJHVnRaWFJ5ZVMxdmNHVnlZWFJ2Y2kxdmNHVnlZWFJ2Y2kxallUQ0NBU0l3RFFZSktvWklodmNOQVFFQkJRQUQKZ2dFUEFEQ0NBUW9DZ2dFQkFMck02TDVRbkxUckhrYnlROGlZeUhXQkF5UVJIZWl6SzlCdmJFQXl2MmtEck55egpRZFRQblFZemR5K3V5cTRSb3ZFWEdLajR3NVBlWjhBREUrdHZBNEdXR2ovNlIzS3cyejhrZStuV3RzYTVFbjI0CkZOZE8rbmd3RUVFSlFqcllwRzAxUDc2RGVUNkJpRkk2NVZ6WnVHS1BQSmk5VVozemtRZytJb2NNdy9RZ3JyL3IKNCswNnlRRWYvMDBaZjNvOUtZd1ltM3Y1WTV6dEJyS2VIOFVWa3B0ZTVmdXY1OS9QT0RpcDNXaW54VG9RcDJ4WQplR0ZVcW5SN0FzTSt1aVRGZWFLK0NvRjJIMFYzbWZlWTlsdlVMOGd3VmhoU1hmUG4xR092bGJEK3FkYkhvTFVWCkZqVExjRzBTenNoTTZZOGhIN3MzRHJ6RzdVd1pkRHVQdWpsNDkwc0NBd0VBQWFOaE1GOHdEZ1lEVlIwUEFRSC8KQkFRREFnS2tNQjBHQTFVZEpRUVdNQlFHQ0NzR0FRVUZCd01CQmdnckJnRUZCUWNEQWpBUEJnTlZIUk1CQWY4RQpCVEFEQVFIL01CMEdBMVVkRGdRV0JCUVE5eTQrRlB6bFNDK1VaZUgreGZNbWZ0dnBwekFOQmdrcWhraUc5dzBCCkFRc0ZBQU9DQVFFQWk0bW9RSTVCdTRORWpKVHlnbjBPYUNLUjQ1NzVJUitVdUYwS3NiSVdVcHU1bTFQOEFoYXoKY1JzZzRRZ1VkMk1Uc0dVWXNZaG5INnlkd0dTV1J2TGNjNnUxMVc3bnNsMVA4VkpxczFQK1M3UEdHRkl3K3dZdwpjNFUzekRpYUR3ZTBOd3g2ams2RFMrVEJtWllMR2NJeGFSZXhqQTRteE0wcVN0WXg0WWZVOFF0RitkWUozR29iCnBmWDcrUmJTckxCZGVGRi9scG9RcFhuNGQrQzhPSVV1R2lheUxSeENROTFSbVRKOTRoeFlwZGcxeG9Pd3N2OU8KclNvanFrSTJHdW9lSlE2OVRhZll3SVg1YTFtY24xZmRrOW5MZGNGejFmVGdaeVg5bzQ2blVzQzN2SngxWHN3dwpFbzlKWW5zZVU3TUt3SmIzOTB0MUpJZ0ZDOVBpZVViUWtRPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+      service:
+        name: splunk-otel-collector-operator-webhook
+        namespace: default
+        path: /mutate-v1-pod
+        port: 443
+    failurePolicy: Ignore
+    name: mpod.kb.io
+    rules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+        resources:
+          - pods
+        scope: Namespaced
+    sideEffects: None
+    timeoutSeconds: 10
+---
+# Source: splunk-otel-collector/charts/operator/templates/admission-webhooks/operator-webhook.yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  labels:
+    helm.sh/chart: operator-0.95.3
+    app.kubernetes.io/name: operator
+    app.kubernetes.io/version: "0.134.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: opentelemetry-operator
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/component: webhook
+  name: splunk-otel-collector-operator-validation
+webhooks:
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURSVENDQWkyZ0F3SUJBZ0lRVEh0VWRLSlVMNWtXZVQzTWdDOEVmVEFOQmdrcWhraUc5dzBCQVFzRkFEQXQKTVNzd0tRWURWUVFERXlKdmNHVnVkR1ZzWlcxbGRISjVMVzl3WlhKaGRHOXlMVzl3WlhKaGRHOXlMV05oTUI0WApEVEkyTURFeU56RTRORFUxTWxvWERUTTJNREV5TlRFNE5EVTFNbG93TFRFck1Da0dBMVVFQXhNaWIzQmxiblJsCmJHVnRaWFJ5ZVMxdmNHVnlZWFJ2Y2kxdmNHVnlZWFJ2Y2kxallUQ0NBU0l3RFFZSktvWklodmNOQVFFQkJRQUQKZ2dFUEFEQ0NBUW9DZ2dFQkFMck02TDVRbkxUckhrYnlROGlZeUhXQkF5UVJIZWl6SzlCdmJFQXl2MmtEck55egpRZFRQblFZemR5K3V5cTRSb3ZFWEdLajR3NVBlWjhBREUrdHZBNEdXR2ovNlIzS3cyejhrZStuV3RzYTVFbjI0CkZOZE8rbmd3RUVFSlFqcllwRzAxUDc2RGVUNkJpRkk2NVZ6WnVHS1BQSmk5VVozemtRZytJb2NNdy9RZ3JyL3IKNCswNnlRRWYvMDBaZjNvOUtZd1ltM3Y1WTV6dEJyS2VIOFVWa3B0ZTVmdXY1OS9QT0RpcDNXaW54VG9RcDJ4WQplR0ZVcW5SN0FzTSt1aVRGZWFLK0NvRjJIMFYzbWZlWTlsdlVMOGd3VmhoU1hmUG4xR092bGJEK3FkYkhvTFVWCkZqVExjRzBTenNoTTZZOGhIN3MzRHJ6RzdVd1pkRHVQdWpsNDkwc0NBd0VBQWFOaE1GOHdEZ1lEVlIwUEFRSC8KQkFRREFnS2tNQjBHQTFVZEpRUVdNQlFHQ0NzR0FRVUZCd01CQmdnckJnRUZCUWNEQWpBUEJnTlZIUk1CQWY4RQpCVEFEQVFIL01CMEdBMVVkRGdRV0JCUVE5eTQrRlB6bFNDK1VaZUgreGZNbWZ0dnBwekFOQmdrcWhraUc5dzBCCkFRc0ZBQU9DQVFFQWk0bW9RSTVCdTRORWpKVHlnbjBPYUNLUjQ1NzVJUitVdUYwS3NiSVdVcHU1bTFQOEFoYXoKY1JzZzRRZ1VkMk1Uc0dVWXNZaG5INnlkd0dTV1J2TGNjNnUxMVc3bnNsMVA4VkpxczFQK1M3UEdHRkl3K3dZdwpjNFUzekRpYUR3ZTBOd3g2ams2RFMrVEJtWllMR2NJeGFSZXhqQTRteE0wcVN0WXg0WWZVOFF0RitkWUozR29iCnBmWDcrUmJTckxCZGVGRi9scG9RcFhuNGQrQzhPSVV1R2lheUxSeENROTFSbVRKOTRoeFlwZGcxeG9Pd3N2OU8KclNvanFrSTJHdW9lSlE2OVRhZll3SVg1YTFtY24xZmRrOW5MZGNGejFmVGdaeVg5bzQ2blVzQzN2SngxWHN3dwpFbzlKWW5zZVU3TUt3SmIzOTB0MUpJZ0ZDOVBpZVViUWtRPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+      service:
+        name: splunk-otel-collector-operator-webhook
+        namespace: default
+        path: /validate-opentelemetry-io-v1alpha1-instrumentation
+        port: 443
+    failurePolicy:  Fail
+    name: vinstrumentationcreateupdate.kb.io
+    rules:
+    - apiGroups:
+        - opentelemetry.io
+      apiVersions:
+        - v1alpha1
+      operations:
+        - CREATE
+        - UPDATE
+      resources:
+        - instrumentations
+      scope: Namespaced
+    sideEffects: None
+    timeoutSeconds: 10
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURSVENDQWkyZ0F3SUJBZ0lRVEh0VWRLSlVMNWtXZVQzTWdDOEVmVEFOQmdrcWhraUc5dzBCQVFzRkFEQXQKTVNzd0tRWURWUVFERXlKdmNHVnVkR1ZzWlcxbGRISjVMVzl3WlhKaGRHOXlMVzl3WlhKaGRHOXlMV05oTUI0WApEVEkyTURFeU56RTRORFUxTWxvWERUTTJNREV5TlRFNE5EVTFNbG93TFRFck1Da0dBMVVFQXhNaWIzQmxiblJsCmJHVnRaWFJ5ZVMxdmNHVnlZWFJ2Y2kxdmNHVnlZWFJ2Y2kxallUQ0NBU0l3RFFZSktvWklodmNOQVFFQkJRQUQKZ2dFUEFEQ0NBUW9DZ2dFQkFMck02TDVRbkxUckhrYnlROGlZeUhXQkF5UVJIZWl6SzlCdmJFQXl2MmtEck55egpRZFRQblFZemR5K3V5cTRSb3ZFWEdLajR3NVBlWjhBREUrdHZBNEdXR2ovNlIzS3cyejhrZStuV3RzYTVFbjI0CkZOZE8rbmd3RUVFSlFqcllwRzAxUDc2RGVUNkJpRkk2NVZ6WnVHS1BQSmk5VVozemtRZytJb2NNdy9RZ3JyL3IKNCswNnlRRWYvMDBaZjNvOUtZd1ltM3Y1WTV6dEJyS2VIOFVWa3B0ZTVmdXY1OS9QT0RpcDNXaW54VG9RcDJ4WQplR0ZVcW5SN0FzTSt1aVRGZWFLK0NvRjJIMFYzbWZlWTlsdlVMOGd3VmhoU1hmUG4xR092bGJEK3FkYkhvTFVWCkZqVExjRzBTenNoTTZZOGhIN3MzRHJ6RzdVd1pkRHVQdWpsNDkwc0NBd0VBQWFOaE1GOHdEZ1lEVlIwUEFRSC8KQkFRREFnS2tNQjBHQTFVZEpRUVdNQlFHQ0NzR0FRVUZCd01CQmdnckJnRUZCUWNEQWpBUEJnTlZIUk1CQWY4RQpCVEFEQVFIL01CMEdBMVVkRGdRV0JCUVE5eTQrRlB6bFNDK1VaZUgreGZNbWZ0dnBwekFOQmdrcWhraUc5dzBCCkFRc0ZBQU9DQVFFQWk0bW9RSTVCdTRORWpKVHlnbjBPYUNLUjQ1NzVJUitVdUYwS3NiSVdVcHU1bTFQOEFoYXoKY1JzZzRRZ1VkMk1Uc0dVWXNZaG5INnlkd0dTV1J2TGNjNnUxMVc3bnNsMVA4VkpxczFQK1M3UEdHRkl3K3dZdwpjNFUzekRpYUR3ZTBOd3g2ams2RFMrVEJtWllMR2NJeGFSZXhqQTRteE0wcVN0WXg0WWZVOFF0RitkWUozR29iCnBmWDcrUmJTckxCZGVGRi9scG9RcFhuNGQrQzhPSVV1R2lheUxSeENROTFSbVRKOTRoeFlwZGcxeG9Pd3N2OU8KclNvanFrSTJHdW9lSlE2OVRhZll3SVg1YTFtY24xZmRrOW5MZGNGejFmVGdaeVg5bzQ2blVzQzN2SngxWHN3dwpFbzlKWW5zZVU3TUt3SmIzOTB0MUpJZ0ZDOVBpZVViUWtRPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+      service:
+        name: splunk-otel-collector-operator-webhook
+        namespace: default
+        path: /validate-opentelemetry-io-v1alpha1-instrumentation
+        port: 443
+    failurePolicy: Ignore
+    name: vinstrumentationdelete.kb.io
+    rules:
+      - apiGroups:
+          - opentelemetry.io
+        apiVersions:
+          - v1alpha1
+        operations:
+          - DELETE
+        resources:
+          - instrumentations
+        scope: Namespaced
+    sideEffects: None
+    timeoutSeconds: 10
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURSVENDQWkyZ0F3SUJBZ0lRVEh0VWRLSlVMNWtXZVQzTWdDOEVmVEFOQmdrcWhraUc5dzBCQVFzRkFEQXQKTVNzd0tRWURWUVFERXlKdmNHVnVkR1ZzWlcxbGRISjVMVzl3WlhKaGRHOXlMVzl3WlhKaGRHOXlMV05oTUI0WApEVEkyTURFeU56RTRORFUxTWxvWERUTTJNREV5TlRFNE5EVTFNbG93TFRFck1Da0dBMVVFQXhNaWIzQmxiblJsCmJHVnRaWFJ5ZVMxdmNHVnlZWFJ2Y2kxdmNHVnlZWFJ2Y2kxallUQ0NBU0l3RFFZSktvWklodmNOQVFFQkJRQUQKZ2dFUEFEQ0NBUW9DZ2dFQkFMck02TDVRbkxUckhrYnlROGlZeUhXQkF5UVJIZWl6SzlCdmJFQXl2MmtEck55egpRZFRQblFZemR5K3V5cTRSb3ZFWEdLajR3NVBlWjhBREUrdHZBNEdXR2ovNlIzS3cyejhrZStuV3RzYTVFbjI0CkZOZE8rbmd3RUVFSlFqcllwRzAxUDc2RGVUNkJpRkk2NVZ6WnVHS1BQSmk5VVozemtRZytJb2NNdy9RZ3JyL3IKNCswNnlRRWYvMDBaZjNvOUtZd1ltM3Y1WTV6dEJyS2VIOFVWa3B0ZTVmdXY1OS9QT0RpcDNXaW54VG9RcDJ4WQplR0ZVcW5SN0FzTSt1aVRGZWFLK0NvRjJIMFYzbWZlWTlsdlVMOGd3VmhoU1hmUG4xR092bGJEK3FkYkhvTFVWCkZqVExjRzBTenNoTTZZOGhIN3MzRHJ6RzdVd1pkRHVQdWpsNDkwc0NBd0VBQWFOaE1GOHdEZ1lEVlIwUEFRSC8KQkFRREFnS2tNQjBHQTFVZEpRUVdNQlFHQ0NzR0FRVUZCd01CQmdnckJnRUZCUWNEQWpBUEJnTlZIUk1CQWY4RQpCVEFEQVFIL01CMEdBMVVkRGdRV0JCUVE5eTQrRlB6bFNDK1VaZUgreGZNbWZ0dnBwekFOQmdrcWhraUc5dzBCCkFRc0ZBQU9DQVFFQWk0bW9RSTVCdTRORWpKVHlnbjBPYUNLUjQ1NzVJUitVdUYwS3NiSVdVcHU1bTFQOEFoYXoKY1JzZzRRZ1VkMk1Uc0dVWXNZaG5INnlkd0dTV1J2TGNjNnUxMVc3bnNsMVA4VkpxczFQK1M3UEdHRkl3K3dZdwpjNFUzekRpYUR3ZTBOd3g2ams2RFMrVEJtWllMR2NJeGFSZXhqQTRteE0wcVN0WXg0WWZVOFF0RitkWUozR29iCnBmWDcrUmJTckxCZGVGRi9scG9RcFhuNGQrQzhPSVV1R2lheUxSeENROTFSbVRKOTRoeFlwZGcxeG9Pd3N2OU8KclNvanFrSTJHdW9lSlE2OVRhZll3SVg1YTFtY24xZmRrOW5MZGNGejFmVGdaeVg5bzQ2blVzQzN2SngxWHN3dwpFbzlKWW5zZVU3TUt3SmIzOTB0MUpJZ0ZDOVBpZVViUWtRPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+      service:
+        name: splunk-otel-collector-operator-webhook
+        namespace: default
+        path: /validate-opentelemetry-io-v1beta1-opentelemetrycollector
+        port: 443
+    failurePolicy: Fail
+    name: vopentelemetrycollectorcreateupdatebeta.kb.io
+    rules:
+      - apiGroups:
+          - opentelemetry.io
+        apiVersions:
+          - v1beta1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - opentelemetrycollectors
+        scope: Namespaced
+    sideEffects: None
+    timeoutSeconds: 10
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURSVENDQWkyZ0F3SUJBZ0lRVEh0VWRLSlVMNWtXZVQzTWdDOEVmVEFOQmdrcWhraUc5dzBCQVFzRkFEQXQKTVNzd0tRWURWUVFERXlKdmNHVnVkR1ZzWlcxbGRISjVMVzl3WlhKaGRHOXlMVzl3WlhKaGRHOXlMV05oTUI0WApEVEkyTURFeU56RTRORFUxTWxvWERUTTJNREV5TlRFNE5EVTFNbG93TFRFck1Da0dBMVVFQXhNaWIzQmxiblJsCmJHVnRaWFJ5ZVMxdmNHVnlZWFJ2Y2kxdmNHVnlZWFJ2Y2kxallUQ0NBU0l3RFFZSktvWklodmNOQVFFQkJRQUQKZ2dFUEFEQ0NBUW9DZ2dFQkFMck02TDVRbkxUckhrYnlROGlZeUhXQkF5UVJIZWl6SzlCdmJFQXl2MmtEck55egpRZFRQblFZemR5K3V5cTRSb3ZFWEdLajR3NVBlWjhBREUrdHZBNEdXR2ovNlIzS3cyejhrZStuV3RzYTVFbjI0CkZOZE8rbmd3RUVFSlFqcllwRzAxUDc2RGVUNkJpRkk2NVZ6WnVHS1BQSmk5VVozemtRZytJb2NNdy9RZ3JyL3IKNCswNnlRRWYvMDBaZjNvOUtZd1ltM3Y1WTV6dEJyS2VIOFVWa3B0ZTVmdXY1OS9QT0RpcDNXaW54VG9RcDJ4WQplR0ZVcW5SN0FzTSt1aVRGZWFLK0NvRjJIMFYzbWZlWTlsdlVMOGd3VmhoU1hmUG4xR092bGJEK3FkYkhvTFVWCkZqVExjRzBTenNoTTZZOGhIN3MzRHJ6RzdVd1pkRHVQdWpsNDkwc0NBd0VBQWFOaE1GOHdEZ1lEVlIwUEFRSC8KQkFRREFnS2tNQjBHQTFVZEpRUVdNQlFHQ0NzR0FRVUZCd01CQmdnckJnRUZCUWNEQWpBUEJnTlZIUk1CQWY4RQpCVEFEQVFIL01CMEdBMVVkRGdRV0JCUVE5eTQrRlB6bFNDK1VaZUgreGZNbWZ0dnBwekFOQmdrcWhraUc5dzBCCkFRc0ZBQU9DQVFFQWk0bW9RSTVCdTRORWpKVHlnbjBPYUNLUjQ1NzVJUitVdUYwS3NiSVdVcHU1bTFQOEFoYXoKY1JzZzRRZ1VkMk1Uc0dVWXNZaG5INnlkd0dTV1J2TGNjNnUxMVc3bnNsMVA4VkpxczFQK1M3UEdHRkl3K3dZdwpjNFUzekRpYUR3ZTBOd3g2ams2RFMrVEJtWllMR2NJeGFSZXhqQTRteE0wcVN0WXg0WWZVOFF0RitkWUozR29iCnBmWDcrUmJTckxCZGVGRi9scG9RcFhuNGQrQzhPSVV1R2lheUxSeENROTFSbVRKOTRoeFlwZGcxeG9Pd3N2OU8KclNvanFrSTJHdW9lSlE2OVRhZll3SVg1YTFtY24xZmRrOW5MZGNGejFmVGdaeVg5bzQ2blVzQzN2SngxWHN3dwpFbzlKWW5zZVU3TUt3SmIzOTB0MUpJZ0ZDOVBpZVViUWtRPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+      service:
+        name: splunk-otel-collector-operator-webhook
+        namespace: default
+        path: /validate-opentelemetry-io-v1beta1-opentelemetrycollector
+        port: 443
+    failurePolicy: Ignore
+    name: vopentelemetrycollectordeletebeta.kb.io
+    rules:
+      - apiGroups:
+          - opentelemetry.io
+        apiVersions:
+          - v1beta1
+        operations:
+          - DELETE
+        resources:
+          - opentelemetrycollectors
+        scope: Namespaced
+    sideEffects: None
+    timeoutSeconds: 10
+---
+# Source: splunk-otel-collector/charts/operator/templates/admission-webhooks/operator-webhook.yaml
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/tls
+metadata:
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+  labels:
+    helm.sh/chart: operator-0.95.3
+    app.kubernetes.io/name: operator
+    app.kubernetes.io/version: "0.134.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: opentelemetry-operator
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/component: webhook
+  name: splunk-otel-collector-operator-controller-manager-service-cert
+  namespace: default
+data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURzVENDQXBtZ0F3SUJBZ0lRRW4zT05HcnZrcmt0UnBSbHg2dFpyREFOQmdrcWhraUc5dzBCQVFzRkFEQXQKTVNzd0tRWURWUVFERXlKdmNHVnVkR1ZzWlcxbGRISjVMVzl3WlhKaGRHOXlMVzl3WlhKaGRHOXlMV05oTUI0WApEVEkyTURFeU56RTRORFUxTWxvWERUTTJNREV5TlRFNE5EVTFNbG93S1RFbk1DVUdBMVVFQXhNZWMzQnNkVzVyCkxXOTBaV3d0WTI5c2JHVmpkRzl5TFc5d1pYSmhkRzl5TUlJQklqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FROEEKTUlJQkNnS0NBUUVBc3JMZXZRaWhFdEFjd0dpTkF4eFVVMU9DVDJRTzV3N3c5SUdzVTBKMUR6QjJybmViNDZXZApjd2FCMC9xWDFvWXBGZmJxNFhpUHBGV2VQRzk0YWFLRk9NTElGTy9qYlZCQ3JubERvSlBoUkZNSGhRbnNma242CkVmTFdTWDNSQzZZMExhbERHWjJjSW9UdTVlVUVTYUJHVERjTCt3OGtsRUFCdGIweFovR3g3T3c0ZVJYeHpSUG4KS1BxMFk2bGhEV01TQkx0TVRPNlFoMXBoSzluaGNsRWxhUmVmWW02eUtVQWlaSkxuVzFlTkJmSVRlUy9vQ2dPOQpFbW03Mmh2ZThVY2ZQcjViVkV5MjRkS3VwSG9VbGpEYnBmd1ptSlRTN2Y2eUdaNm1iRGlhWlJkbUd5QjQ3KzJ4Ck52RlM3RnB4M0NoMWN6Ynp4c3hhSUV6a3RWbFBuZ1ExeXdJREFRQUJvNEhRTUlITk1BNEdBMVVkRHdFQi93UUUKQXdJRm9EQWRCZ05WSFNVRUZqQVVCZ2dyQmdFRkJRY0RBUVlJS3dZQkJRVUhBd0l3REFZRFZSMFRBUUgvQkFJdwpBREFmQmdOVkhTTUVHREFXZ0JRUTl5NCtGUHpsU0MrVVplSCt4Zk1tZnR2cHB6QnRCZ05WSFJFRVpqQmtnaTV6CmNHeDFibXN0YjNSbGJDMWpiMnhzWldOMGIzSXRiM0JsY21GMGIzSXRkMlZpYUc5dmF5NWtaV1poZFd4MGdqSnoKY0d4MWJtc3RiM1JsYkMxamIyeHNaV04wYjNJdGIzQmxjbUYwYjNJdGQyVmlhRzl2YXk1a1pXWmhkV3gwTG5OMgpZekFOQmdrcWhraUc5dzBCQVFzRkFBT0NBUUVBWTZiR2h5QlVpdjhPMHFUU3VUWWtYWmk5eUFPSTY2SUpQNXV4CmZWS29Mb3dKUzhaYWdUamFUamU1N0dkaFFwRGJ2WVpkVkhFRk9pSTNrbVpOWlBBOHoraENKZFJhVFd5K3draE0KV3NJbjNOZmRYbXlRMVJuVGxiTW9vQlVnWVBtWkZ1UVUxQmlSZTRXWGR0SmMvckN3S0JCUWw3OTFRdVdDK2pLUgoxd3liMWpmQ0Zld3p6WGR6UFRPbGk5emg4dFlvN2s5ZzhLa1RzWTM3alhURzcwUHlOMWp2citXdjJUbWJUSmU3CmZaL2VVaW9seHlJY1BOSjlldWszV0Y5MkdDSjBrVWJITTlFbDlCTXhtOWhLY05BMUZBUzRTRzVrMDkwSmI2V1gKSDlQZEtsdmFXNUwydWtaakJscGZTRzFEK21hNE9CaGJjcGU4aUVqNDJTQlBOcGdyd0E9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+  tls.key: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFb3dJQkFBS0NBUUVBc3JMZXZRaWhFdEFjd0dpTkF4eFVVMU9DVDJRTzV3N3c5SUdzVTBKMUR6QjJybmViCjQ2V2Rjd2FCMC9xWDFvWXBGZmJxNFhpUHBGV2VQRzk0YWFLRk9NTElGTy9qYlZCQ3JubERvSlBoUkZNSGhRbnMKZmtuNkVmTFdTWDNSQzZZMExhbERHWjJjSW9UdTVlVUVTYUJHVERjTCt3OGtsRUFCdGIweFovR3g3T3c0ZVJYeAp6UlBuS1BxMFk2bGhEV01TQkx0TVRPNlFoMXBoSzluaGNsRWxhUmVmWW02eUtVQWlaSkxuVzFlTkJmSVRlUy9vCkNnTzlFbW03Mmh2ZThVY2ZQcjViVkV5MjRkS3VwSG9VbGpEYnBmd1ptSlRTN2Y2eUdaNm1iRGlhWlJkbUd5QjQKNysyeE52RlM3RnB4M0NoMWN6Ynp4c3hhSUV6a3RWbFBuZ1ExeXdJREFRQUJBb0lCQUJjRy9WOCsrMEZUM1JOSgpteERtdDlKc1dwM3dFYldNL2kyR2Y1WXBEd2J2NHFpZjFDV2YyVmE4Wk1MVUIzaWNTRE50alVpVWJjVFU4dk9YCkZRZ0pGU3dYenVCWDBLYnMrL0xFd0p0ZGd3bE5hUlRTancyYWF5V2duODdQbU9rWE4vWnNXZHBnQTRIZjZjaHAKTWNZVkVsOU80VXN2Qzkwb3Z3VCsyM0lwWkpsWUxpRFU1cnV5cWNQM1E5Zk1BK09xU1dXeENmRTZoT01ieTZrSwprS1VaakxncVk0cXQ0U0NBWXBMZXFoZnJONU5oU3pjV3ROK281ZWtMVkJMQkhQamJtNHZFZ3d5bkZ6ZkJJdm9xCjNRWVZEdHpHbElvUmRkem16NVVlclpnRnFWdDNFa0tVelczQU9NOXpVd28ySmNFS2dROXFlWEhjdTdGTU5yZEcKZHFuQitXVUNnWUVBNE5mYVBWQTFxMWh1UzVoVG5tSXUyVmJ6Z05FNStpWnYrelNOalA0eWRaYWJnZmd6enE0VAptTjlRMFBYOEhKUEFVSGN5aGRhcEVjUTBmQkhaVWVvOGIyYXg1SkN5UG1FV08xdVdZOU5QZC9TMFowZ01QVmdSClJYelBzaEVLNGRrY3Vac0NVcUpKMGE5bklQbzExRFdrMnRWVHRDTEgzNDhXQjFPSU5nTzZubDBDZ1lFQXkzWVQKa1lJbFR5RmVHZ1M4d2s5RTBpOStHQ2hMZG5taFovVGJMaVNQNGJzOXpnMk9ESEt2bUJGMXByNnVSbmd1SGNEKwo0QWprYmkrTWtCQnpReXVYak5pWS9jaS9VZ0UzelloMkJZbnZRbWRPdURzMEFlM2dPOFBSa3o4dnpRNE0zQ2M2ClBBZjdHNDN4SWtzR2wzWDVqZnFEZjV5T0dBNzdSMW94VU9NaTBrY0NnWUJ3KzRacThQZEhGclMxditHazRPbHgKeFVPdkkzUGl3NVhad1ZxdjByeEFZbUhhT1lLdkJNSk1PMHM4OVo2dUxZQ2g3b093eFdGSDBEUWZkRWlqNVBSaApkbFZGNlgvbjRKbHZVbUtMM3c4NzAvY2pQdzBIZGsyWGdWUk13a3VabWFQWmtJN21QeTZnODJiN0owQU5WcmQwClQyWTBTcFh0UE5WdzhRU3RQOHB5OFFLQmdRQy81TTZSOTFDZThGYWpiWUptTllNd1JmREVjZ1N5YWdjc1dBajgKM1NrQytxbFJGUUc3aGROTk5uSmpZUVpYbW5QTVJrRmRKYVhrc2wzOVpqWi96TFp6OWJsZDZwOWZoWnlPOGp4MQovdUUxSE9CbTdCZWlGaXZkMGxOd2NERHlVbVVZb3JyTzhhd0pFZmV5bzFaRk5kUzM3dVZsVDAvSkt5QWQ3TmdFCmRTVmJjd0tCZ0JPVDVVRzlDSG95UVVieHd4dE1kd0RIcVBlSGRQTFQxTjl5TEUyckdhZnlvSWU5NTFRRXdoUGcKbXpGRnR0ZlZRaXlMamFpaVd1Yk1qa1d5Zm8wSisrb3ZYcXNYaVlpbEpNdVhLbXRsa2RScmZERUptZ0FXUTJwUApoK3RGQmFBT1JFMjJDM2c5WVZRMFpONmQxR2p4eFZ4QVFoOWRpaUo2UUQ2L1BFOVR5NzZMCi0tLS0tRU5EIFJTQSBQUklWQVRFIEtFWS0tLS0tCg==
+  ca.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURSVENDQWkyZ0F3SUJBZ0lRVEh0VWRLSlVMNWtXZVQzTWdDOEVmVEFOQmdrcWhraUc5dzBCQVFzRkFEQXQKTVNzd0tRWURWUVFERXlKdmNHVnVkR1ZzWlcxbGRISjVMVzl3WlhKaGRHOXlMVzl3WlhKaGRHOXlMV05oTUI0WApEVEkyTURFeU56RTRORFUxTWxvWERUTTJNREV5TlRFNE5EVTFNbG93TFRFck1Da0dBMVVFQXhNaWIzQmxiblJsCmJHVnRaWFJ5ZVMxdmNHVnlZWFJ2Y2kxdmNHVnlZWFJ2Y2kxallUQ0NBU0l3RFFZSktvWklodmNOQVFFQkJRQUQKZ2dFUEFEQ0NBUW9DZ2dFQkFMck02TDVRbkxUckhrYnlROGlZeUhXQkF5UVJIZWl6SzlCdmJFQXl2MmtEck55egpRZFRQblFZemR5K3V5cTRSb3ZFWEdLajR3NVBlWjhBREUrdHZBNEdXR2ovNlIzS3cyejhrZStuV3RzYTVFbjI0CkZOZE8rbmd3RUVFSlFqcllwRzAxUDc2RGVUNkJpRkk2NVZ6WnVHS1BQSmk5VVozemtRZytJb2NNdy9RZ3JyL3IKNCswNnlRRWYvMDBaZjNvOUtZd1ltM3Y1WTV6dEJyS2VIOFVWa3B0ZTVmdXY1OS9QT0RpcDNXaW54VG9RcDJ4WQplR0ZVcW5SN0FzTSt1aVRGZWFLK0NvRjJIMFYzbWZlWTlsdlVMOGd3VmhoU1hmUG4xR092bGJEK3FkYkhvTFVWCkZqVExjRzBTenNoTTZZOGhIN3MzRHJ6RzdVd1pkRHVQdWpsNDkwc0NBd0VBQWFOaE1GOHdEZ1lEVlIwUEFRSC8KQkFRREFnS2tNQjBHQTFVZEpRUVdNQlFHQ0NzR0FRVUZCd01CQmdnckJnRUZCUWNEQWpBUEJnTlZIUk1CQWY4RQpCVEFEQVFIL01CMEdBMVVkRGdRV0JCUVE5eTQrRlB6bFNDK1VaZUgreGZNbWZ0dnBwekFOQmdrcWhraUc5dzBCCkFRc0ZBQU9DQVFFQWk0bW9RSTVCdTRORWpKVHlnbjBPYUNLUjQ1NzVJUitVdUYwS3NiSVdVcHU1bTFQOEFoYXoKY1JzZzRRZ1VkMk1Uc0dVWXNZaG5INnlkd0dTV1J2TGNjNnUxMVc3bnNsMVA4VkpxczFQK1M3UEdHRkl3K3dZdwpjNFUzekRpYUR3ZTBOd3g2ams2RFMrVEJtWllMR2NJeGFSZXhqQTRteE0wcVN0WXg0WWZVOFF0RitkWUozR29iCnBmWDcrUmJTckxCZGVGRi9scG9RcFhuNGQrQzhPSVV1R2lheUxSeENROTFSbVRKOTRoeFlwZGcxeG9Pd3N2OU8KclNvanFrSTJHdW9lSlE2OVRhZll3SVg1YTFtY24xZmRrOW5MZGNGejFmVGdaeVg5bzQ2blVzQzN2SngxWHN3dwpFbzlKWW5zZVU3TUt3SmIzOTB0MUpJZ0ZDOVBpZVViUWtRPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+---
+# Source: splunk-otel-collector/charts/operator/templates/tests/test-service-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "splunk-otel-collector-operator-metrics"
+  namespace: default
+  labels:
+    helm.sh/chart: operator-0.95.3
+    app.kubernetes.io/name: operator
+    app.kubernetes.io/version: "0.134.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: opentelemetry-operator
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/component: controller-manager
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: "busybox:latest"
+      env:
+        - name: MANAGER_METRICS_SERVICE_CLUSTERIP
+          value: "splunk-otel-collector-operator"
+        - name: MANAGER_METRICS_SERVICE_PORT
+          value: "8443"
+      command:
+        - sh
+        - -c
+        # The following shell script tests if the controller-manager-metrics-service is up.
+        # If the service is up, when we try to wget its exposed port, we will get an HTTP error 400.
+        - |
+          wget_output=$(wget -q "$MANAGER_METRICS_SERVICE_CLUSTERIP:$MANAGER_METRICS_SERVICE_PORT")
+          if wget_output=="wget: server returned error: HTTP/1.0 400 Bad Request"
+          then exit 0
+          else exit 1
+          fi
+      securityContext: 
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+  restartPolicy: Never
+  nodeSelector: 
+    kubernetes.io/os: linux
+  securityContext:
+    fsGroup: 65532
+    runAsGroup: 65532
+    runAsNonRoot: true
+    runAsUser: 65532
+---
+# Source: splunk-otel-collector/charts/operator/templates/tests/test-service-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "splunk-otel-collector-operator-webhook"
+  namespace: default
+  labels:
+    helm.sh/chart: operator-0.95.3
+    app.kubernetes.io/name: operator
+    app.kubernetes.io/version: "0.134.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/part-of: opentelemetry-operator
+    app.kubernetes.io/instance: splunk-otel-collector
+    app.kubernetes.io/component: controller-manager
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: "busybox:latest"
+      env:
+        - name: WEBHOOK_SERVICE_CLUSTERIP
+          value: "splunk-otel-collector-operator-webhook"
+        - name: WEBHOOK_SERVICE_PORT
+          value: "443"
+      command:
+        - sh
+        - -c
+        # The following shell script tests if the webhook service is up. If the service is up, when we try
+        # to wget its exposed port, we will get an HTTP error 400.
+        - |
+          wget_output=$(wget -q "$WEBHOOK_SERVICE_CLUSTERIP:$WEBHOOK_SERVICE_PORT")
+          if wget_output=="wget: server returned error: HTTP/1.0 400 Bad Request"
+          then exit 0
+          else exit 1
+          fi
+      securityContext: 
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+  restartPolicy: Never
+  nodeSelector: 
+    kubernetes.io/os: linux
+  securityContext:
+    fsGroup: 65532
+    runAsGroup: 65532
+    runAsNonRoot: true
+    runAsUser: 65532
+

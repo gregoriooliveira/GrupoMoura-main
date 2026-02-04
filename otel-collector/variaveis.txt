@@ -1,0 +1,76 @@
+SPLUNK_CONFIG_YAML_x
+SPLUNK_HEC_TOKEN_x
+SPLUNK_ACCESS_TOKEN_x
+
+OTEL_SERVICE_NAME=greg-backend
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+OTEL_RESOURCE_ATTRIBUTES=deployment.environment=lab,service.namespace=managed-environment-greg
+OTEL_LOG_LEVEL=INFO
+
+OTEL_RESOURCE_ATTRIBUTES=deployment.environment=lab,cloud.platform=azure_container_apps
+
+OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+CONTAINERAPP_OTEL_METRIC_GRPC_ENDPOINT=http://k8se-otel.k8se-apps.svc.cluster.local:4317/v1/metrics
+OTEL_SERVICE_NAME=greg-nodejs-lab-backend
+OTEL_LOG_LEVEL=INFO
+OTEL_EXPORTER_OTLP_ENDPOINT=http://k8se-otel.k8se-apps.svc.cluster.local:4317
+CONTAINERAPP_OTEL_LOGGING_GRPC_ENDPOINT=http://k8se-otel.k8se-apps.svc.cluster.local:4317/v1/logs
+OTEL_RESOURCE_ATTRIBUTES=service.instance.id=greg-nodejs-lab-backend--0000024-696fff8fd6-kxhnp,service.namespace=managed-environment-greg,service.version=greg-nodejs-lab-backend--0000024
+CONTAINERAPP_OTEL_TRACING_GRPC_ENDPOINT=http://k8se-otel.k8se-apps.svc.cluster.local:4317/v1/traces
+
+
+CONTAINER_APP_HOSTNAME=greg-backend--0000004.wonderfulpebble-818556f6.eastus.azurecontainerapps.io
+KUBERNETES_PORT=tcp://100.100.224.1:443
+KUBERNETES_SERVICE_PORT=443
+NODE_VERSION=18.20.8
+OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+YARN_VERSION=1.22.22
+CONTAINERAPP_OTEL_METRIC_GRPC_ENDPOINT=http://k8se-otel.k8se-apps.svc.cluster.local:4317/v1/metrics
+XOTEL_SERVICE_NAME=greg-backend
+OTEL_SERVICE_NAME=greg-backend
+HOME=/root
+CONTAINER_APP_ENV_DNS_SUFFIX=wonderfulpebble-818556f6.eastus.azurecontainerapps.io
+CONTAINER_APP_REPLICA_NAME=greg-backend--0000004-64f9dc95bd-lw4g9
+CONTAINER_APP_REVISION=greg-backend--0000004
+KUBERNETES_PORT_443_TCP_ADDR=100.100.224.1
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+KUBERNETES_PORT_443_TCP_PORT=443
+XOTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+KUBERNETES_PORT_443_TCP_PROTO=tcp
+OTEL_LOG_LEVEL=INFO
+OTEL_EXPORTER_OTLP_ENDPOINT=http://k8se-otel.k8se-apps.svc.cluster.local:4317
+CONTAINER_APP_PORT=3000
+XOTEL_RESOURCE_ATTRIBUTES=deployment.environment=lab,service.namespace=managed-environment-greg
+KUBERNETES_PORT_443_TCP=tcp://100.100.224.1:443
+KUBERNETES_SERVICE_PORT_HTTPS=443
+CONTAINERAPP_OTEL_LOGGING_GRPC_ENDPOINT=http://k8se-otel.k8se-apps.svc.cluster.local:4317/v1/logs
+CONTAINERAPP_OTEL_TRACING_GRPC_ENDPOINT=http://k8se-otel.k8se-apps.svc.cluster.local:4317/v1/traces
+CONTAINER_APP_NAME=greg-backend
+KUBERNETES_SERVICE_HOST=100.100.224.1
+OTEL_RESOURCE_ATTRIBUTES=service.instance.id=greg-backend--0000004-64f9dc95bd-lw4g9,service.namespace=managedEnvironment-dumontresourceg-bf28,service.version=greg-backend--0000004
+PWD=/app
+DB_HOST=greg-postgres
+
+
+jfM5suDRkK3_0egHSDJ-Fw
+
+curl -X POST https://ingest.us1.signalfx.com/v2/trace/otlp \
+  -H "Content-Type: application/x-protobuf" \
+  -H "X-SF-Token: jfM5suDRkK3_0egHSDJ-Fw" \
+  --data-binary ''  # payload vazio para teste auth
+
+
+  az containerapp env show --name managed-environment-greg --resource-group dumont-east-us --query "properties.openTelemetryConfiguration.destinationsConfiguration.otlpConfigurations"
+
+  az containerapp env telemetry otlp add --resource-group dumont-east-us --name managed-environment-greg --otlp-name "splUnk-o11y" --endpoint "https://ingest.us1.signalfx.com" --insecure false --headers "X-SF-Token=jfM5suDRkK3_0egHSDJ-Fw" --enable-open-telemetry-traces true --enable-open-telemetry-metrics true --enable-open-telemetry-logs true
+
+  az containerapp env telemetry otlp update \
+  --resource-group dumont-east-us \
+  --name managed-environment-greg \
+  --otlp-name splynk-o11y \
+  --endpoint "https://ingest.us1.signalfx.com/v2/datapoint/otlp" \
+  --insecure false \
+  --headers "X-SF-Token=jfM5suDRkK3_0egHSDJ-Fw" \
+  --enable-open-telemetry-traces true \
+  --enable-open-telemetry-metrics true \
+  --enable-open-telemetry-logs true

@@ -1,0 +1,26 @@
+{
+  "name": "api-cotacoes",
+  "version": "1.0.0",
+  "description": "API Node.js para cotações e auditoria",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@opentelemetry/exporter-logs-otlp-grpc": "^0.208.0",
+    "@opentelemetry/exporter-logs-otlp-http": "^0.208.0",
+    "@opentelemetry/resources": "^1.20.0",
+    "@opentelemetry/sdk-logs": "^0.208.0",
+    "@splunk/otel": "^4.3.0",
+    "axios": "^1.6.2",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "pg": "^8.11.3",
+    "winston": "^3.12.0",
+    "winston-transport": "^4.6.0"
+  }
+}
