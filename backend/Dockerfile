@@ -8,6 +8,7 @@ RUN --mount=type=cache,target=/root/.npm \
     npm install
 
 COPY server.js ./server.js
+COPY otel-logs.js ./otel-logs.js
 
 EXPOSE 3000
 
