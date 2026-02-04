@@ -76,16 +76,18 @@ jobs:
 
       - name: Deploy backend to ACA
         run: |
-          APP_ID=$(az containerapp show --resource-group "$RESOURCE_GROUP" --name "$ACA_BACKEND_APP" --query id -o tsv)
-          CONTAINER_NAME=$(az containerapp show --resource-group "$RESOURCE_GROUP" --name "$ACA_BACKEND_APP" --query properties.template.containers[0].name -o tsv)
+          APP_URL="https://management.azure.com/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.App/containerApps/${ACA_BACKEND_APP}?api-version=2023-05-01"
+          APP_JSON=$(az rest --method GET --url "$APP_URL")
+          CONTAINER_NAME=$(python -c "import json,sys;print(json.load(sys.stdin)['properties']['template']['containers'][0]['name'])" <<<"$APP_JSON")
           az rest --method PATCH \
-            --url "https://management.azure.com${APP_ID}?api-version=2023-05-01" \
+            --url "$APP_URL" \
             --body "{\"properties\":{\"template\":{\"containers\":[{\"name\":\"${CONTAINER_NAME}\",\"image\":\"${REGISTRY}/${BACKEND_IMAGE}:${{ github.sha }}\"}]}}}"
 
       - name: Deploy robot to ACA
         run: |
-          APP_ID=$(az containerapp show --resource-group "$RESOURCE_GROUP" --name "$ACA_ROBOT_APP" --query id -o tsv)
-          CONTAINER_NAME=$(az containerapp show --resource-group "$RESOURCE_GROUP" --name "$ACA_ROBOT_APP" --query properties.template.containers[0].name -o tsv)
+          APP_URL="https://management.azure.com/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.App/containerApps/${ACA_ROBOT_APP}?api-version=2023-05-01"
+          APP_JSON=$(az rest --method GET --url "$APP_URL")
+          CONTAINER_NAME=$(python -c "import json,sys;print(json.load(sys.stdin)['properties']['template']['containers'][0]['name'])" <<<"$APP_JSON")
           az rest --method PATCH \
-            --url "https://management.azure.com${APP_ID}?api-version=2023-05-01" \
+            --url "$APP_URL" \
             --body "{\"properties\":{\"template\":{\"containers\":[{\"name\":\"${CONTAINER_NAME}\",\"image\":\"${REGISTRY}/${ROBOT_IMAGE}:${{ github.sha }}\"}]}}}"
