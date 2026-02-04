@@ -67,6 +67,9 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Set Azure subscription
+        run: az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
       - name: Ensure Azure CLI containerapp extension
         run: |
           az extension add --name containerapp --upgrade
