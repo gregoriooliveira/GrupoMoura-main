@@ -70,7 +70,6 @@ jobs:
       - name: Ensure Azure CLI containerapp extension
         run: |
           az extension add --name containerapp --upgrade
-          az provider register --namespace Microsoft.App
 
       - name: Deploy backend to ACA
         run: |
