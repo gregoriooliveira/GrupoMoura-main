@@ -109,7 +109,9 @@ jobs:
           print(json.dumps({"properties":{"template":{"containers":containers}}}))
           PY
           )
-          if ! PATCH_RESULT=$(az rest --method PATCH --url "$APP_URL" --body "$PATCH_BODY" -o json 2>&1); then
+          PATCH_FILE=$(mktemp)
+          printf '%s' "$PATCH_BODY" > "$PATCH_FILE"
+          if ! PATCH_RESULT=$(az rest --method PATCH --url "$APP_URL" --body @"$PATCH_FILE" -o json 2>&1); then
             echo "ERROR: az rest PATCH failed (backend)"
             echo "$PATCH_RESULT"
             exit 1
@@ -150,7 +152,9 @@ jobs:
           print(json.dumps({"properties":{"template":{"containers":containers}}}))
           PY
           )
-          if ! PATCH_RESULT=$(az rest --method PATCH --url "$APP_URL" --body "$PATCH_BODY" -o json 2>&1); then
+          PATCH_FILE=$(mktemp)
+          printf '%s' "$PATCH_BODY" > "$PATCH_FILE"
+          if ! PATCH_RESULT=$(az rest --method PATCH --url "$APP_URL" --body @"$PATCH_FILE" -o json 2>&1); then
             echo "ERROR: az rest PATCH failed (robot)"
             echo "$PATCH_RESULT"
             exit 1
