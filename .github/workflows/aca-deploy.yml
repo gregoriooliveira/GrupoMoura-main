@@ -78,16 +78,40 @@ jobs:
         run: |
           APP_URL="https://management.azure.com/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.App/containerApps/${ACA_BACKEND_APP}?api-version=2023-05-01"
           APP_JSON=$(az rest --method GET --url "$APP_URL")
-          CONTAINER_NAME=$(python -c "import json,sys;d=json.load(sys.stdin);print(d['properties']['template']['containers'][0]['name']) if 'properties' in d else (print('ERROR: invalid response for backend app:', d), exit(1))" <<<"$APP_JSON")
-          az rest --method PATCH \
-            --url "$APP_URL" \
-            --body "{\"properties\":{\"template\":{\"containers\":[{\"name\":\"${CONTAINER_NAME}\",\"image\":\"${REGISTRY}/${BACKEND_IMAGE}:${{ github.sha }}\"}]}}}"
+          PATCH_BODY=$(python - <<'PY'
+          import json,sys
+          data = json.load(sys.stdin)
+          if 'properties' not in data or 'template' not in data['properties']:
+              print(json.dumps({"error":"invalid response for backend app","data":data}))
+              sys.exit(1)
+          tmpl = data['properties']['template']
+          containers = tmpl.get('containers', [])
+          if not containers:
+              print(json.dumps({"error":"no containers found","data":data}))
+              sys.exit(1)
+          containers[0]['image'] = f"{sys.argv[1]}/{sys.argv[2]}:{sys.argv[3]}"
+          print(json.dumps({"properties":{"template":{"containers":containers}}}))
+          PY
+          "$REGISTRY" "$BACKEND_IMAGE" "${{ github.sha }}" <<<"$APP_JSON")
+          az rest --method PATCH --url "$APP_URL" --body "$PATCH_BODY"
 
       - name: Deploy robot to ACA
         run: |
           APP_URL="https://management.azure.com/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.App/containerApps/${ACA_ROBOT_APP}?api-version=2023-05-01"
           APP_JSON=$(az rest --method GET --url "$APP_URL")
-          CONTAINER_NAME=$(python -c "import json,sys;d=json.load(sys.stdin);print(d['properties']['template']['containers'][0]['name']) if 'properties' in d else (print('ERROR: invalid response for robot app:', d), exit(1))" <<<"$APP_JSON")
-          az rest --method PATCH \
-            --url "$APP_URL" \
-            --body "{\"properties\":{\"template\":{\"containers\":[{\"name\":\"${CONTAINER_NAME}\",\"image\":\"${REGISTRY}/${ROBOT_IMAGE}:${{ github.sha }}\"}]}}}"
+          PATCH_BODY=$(python - <<'PY'
+          import json,sys
+          data = json.load(sys.stdin)
+          if 'properties' not in data or 'template' not in data['properties']:
+              print(json.dumps({"error":"invalid response for robot app","data":data}))
+              sys.exit(1)
+          tmpl = data['properties']['template']
+          containers = tmpl.get('containers', [])
+          if not containers:
+              print(json.dumps({"error":"no containers found","data":data}))
+              sys.exit(1)
+          containers[0]['image'] = f"{sys.argv[1]}/{sys.argv[2]}:{sys.argv[3]}"
+          print(json.dumps({"properties":{"template":{"containers":containers}}}))
+          PY
+          "$REGISTRY" "$ROBOT_IMAGE" "${{ github.sha }}" <<<"$APP_JSON")
+          az rest --method PATCH --url "$APP_URL" --body "$PATCH_BODY"
