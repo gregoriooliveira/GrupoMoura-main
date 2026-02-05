@@ -78,7 +78,11 @@ jobs:
         run: |
           set -euo pipefail
           APP_URL="https://management.azure.com/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.App/containerApps/${ACA_BACKEND_APP}?api-version=2023-05-01"
-          APP_JSON=$(az rest --method GET --url "$APP_URL" -o json)
+          if ! APP_JSON=$(az rest --method GET --url "$APP_URL" -o json 2>&1); then
+            echo "ERROR: az rest GET failed (backend)"
+            echo "$APP_JSON"
+            exit 1
+          fi
           if [ -z "$APP_JSON" ]; then
             echo "ERROR: empty APP_JSON from az rest (backend)"
             exit 1
@@ -111,7 +115,11 @@ jobs:
         run: |
           set -euo pipefail
           APP_URL="https://management.azure.com/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.App/containerApps/${ACA_ROBOT_APP}?api-version=2023-05-01"
-          APP_JSON=$(az rest --method GET --url "$APP_URL" -o json)
+          if ! APP_JSON=$(az rest --method GET --url "$APP_URL" -o json 2>&1); then
+            echo "ERROR: az rest GET failed (robot)"
+            echo "$APP_JSON"
+            exit 1
+          fi
           if [ -z "$APP_JSON" ]; then
             echo "ERROR: empty APP_JSON from az rest (robot)"
             exit 1
