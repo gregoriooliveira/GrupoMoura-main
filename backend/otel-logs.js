@@ -3,6 +3,7 @@ const { LoggerProvider, BatchLogRecordProcessor } = require('@opentelemetry/sdk-
 const { Resource } = require('@opentelemetry/resources');
 const winston = require('winston');
 const Transport = require('winston-transport');
+const axios = require('axios');
 
 function parseResourceAttributes(raw) {
   if (!raw) return {};
@@ -115,6 +116,50 @@ class OTelTransport extends Transport {
   }
 }
 
+class SplunkHecTransport extends Transport {
+  constructor(opts) {
+    super(opts);
+    this.hecUrl = opts.hecUrl;
+    this.hecToken = opts.hecToken;
+    this.source = opts.source || 'otel';
+    this.sourcetype = opts.sourcetype || 'otel';
+    this.host = opts.host || undefined;
+  }
+
+  log(info, callback) {
+    setImmediate(() => this.emit('logged', info));
+
+    const payload = {
+      time: Date.now() / 1000,
+      host: this.host,
+      source: this.source,
+      sourcetype: this.sourcetype,
+      event: {
+        message: info.message,
+        level: info.level,
+        timestamp: info.timestamp,
+        trace_id: info.trace_id,
+        span_id: info.span_id,
+      },
+      fields: {
+        service: process.env.OTEL_SERVICE_NAME || 'api-cotacoes',
+      },
+    };
+
+    axios
+      .post(this.hecUrl, payload, {
+        headers: {
+          Authorization: `Splunk ${this.hecToken}`,
+        },
+        timeout: 5000,
+      })
+      .catch((err) => {
+        this.emit('error', err);
+      })
+      .finally(() => callback());
+  }
+}
+
 function createWinstonLogger(otelLogger) {
   const addTraceContext = winston.format((info) => {
     const span = trace.getActiveSpan();
@@ -126,6 +171,22 @@ function createWinstonLogger(otelLogger) {
     return info;
   });
 
+  const transports = [new winston.transports.Console()];
+  if (otelLogger) {
+    transports.push(new OTelTransport({ otelLogger }));
+  }
+  if (process.env.SPLUNK_HEC_URL && process.env.SPLUNK_HEC_TOKEN) {
+    transports.push(
+      new SplunkHecTransport({
+        hecUrl: process.env.SPLUNK_HEC_URL,
+        hecToken: process.env.SPLUNK_HEC_TOKEN,
+        source: process.env.SPLUNK_HEC_SOURCE,
+        sourcetype: process.env.SPLUNK_HEC_SOURCETYPE,
+        host: process.env.SPLUNK_HEC_HOST,
+      })
+    );
+  }
+
   return winston.createLogger({
     level: process.env.LOG_LEVEL || 'info',
     format: winston.format.combine(
@@ -133,18 +194,18 @@ function createWinstonLogger(otelLogger) {
       winston.format.timestamp(),
       winston.format.json()
     ),
-    transports: [
-      new winston.transports.Console(),
-      new OTelTransport({ otelLogger }),
-    ],
+    transports,
   });
 }
 
 let provider;
 let logger;
 try {
-  provider = createLoggerProvider();
-  const otelLogger = provider.getLogger('app-logger');
+  let otelLogger;
+  if ((process.env.OTEL_LOGS_EXPORTER || 'otlp').toLowerCase() !== 'none') {
+    provider = createLoggerProvider();
+    otelLogger = provider.getLogger('app-logger');
+  }
   logger = createWinstonLogger(otelLogger);
 } catch (err) {
   // Fallback logger keeps app running even if OTLP setup fails
