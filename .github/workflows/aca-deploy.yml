@@ -77,38 +77,25 @@ jobs:
       - name: Deploy backend to ACA
         run: |
           set -euo pipefail
+          az config set core.only_show_errors=true
           APP_URL="https://management.azure.com/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.App/containerApps/${ACA_BACKEND_APP}?api-version=2023-05-01"
-          if ! APP_JSON=$(az rest --method GET --url "$APP_URL" -o json 2>&1); then
+          if ! APP_JSON=$(az rest --method GET --url "$APP_URL" -o json); then
             echo "ERROR: az rest GET failed (backend)"
-            echo "$APP_JSON"
             exit 1
           fi
           if [ -z "$APP_JSON" ]; then
             echo "ERROR: empty APP_JSON from az rest (backend)"
             exit 1
           fi
-          PATCH_BODY=$(echo "$APP_JSON" | python - <<'PY'
-          import json, os, sys
-          raw = sys.stdin.read().strip()
-          if not raw:
-              print(json.dumps({"error":"empty APP_JSON for backend"}))
-              sys.exit(1)
-          data = json.loads(raw)
-          if 'properties' not in data or 'template' not in data['properties']:
-              print(json.dumps({"error":"invalid response for backend app","data":data}))
-              sys.exit(1)
-          tmpl = data['properties']['template']
-          containers = tmpl.get('containers', [])
-          if not containers:
-              print(json.dumps({"error":"no containers found","data":data}))
-              sys.exit(1)
-          registry = os.environ["REGISTRY"]
-          image = os.environ["BACKEND_IMAGE"]
-          sha = os.environ["GITHUB_SHA"]
-          containers[0]['image'] = f"{registry}/{image}:{sha}"
-          print(json.dumps({"properties":{"template":{"containers":containers}}}))
-          PY
-          )
+          NEW_IMAGE="${REGISTRY}/${BACKEND_IMAGE}:${GITHUB_SHA}"
+          PATCH_BODY=$(echo "$APP_JSON" | jq -c --arg img "$NEW_IMAGE" '
+            if (.properties.template.containers | length) == 0 then
+              error("no containers found")
+            else
+              .properties.template.containers[0].image = $img
+              | {properties:{template:{containers:.properties.template.containers}}}
+            end
+          ')
           PATCH_FILE=$(mktemp)
           printf '%s' "$PATCH_BODY" > "$PATCH_FILE"
           if ! PATCH_RESULT=$(az rest --method PATCH --url "$APP_URL" --body @"$PATCH_FILE" -o json 2>&1); then
@@ -120,38 +107,25 @@ jobs:
       - name: Deploy robot to ACA
         run: |
           set -euo pipefail
+          az config set core.only_show_errors=true
           APP_URL="https://management.azure.com/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.App/containerApps/${ACA_ROBOT_APP}?api-version=2023-05-01"
-          if ! APP_JSON=$(az rest --method GET --url "$APP_URL" -o json 2>&1); then
+          if ! APP_JSON=$(az rest --method GET --url "$APP_URL" -o json); then
             echo "ERROR: az rest GET failed (robot)"
-            echo "$APP_JSON"
             exit 1
           fi
           if [ -z "$APP_JSON" ]; then
             echo "ERROR: empty APP_JSON from az rest (robot)"
             exit 1
           fi
-          PATCH_BODY=$(echo "$APP_JSON" | python - <<'PY'
-          import json, os, sys
-          raw = sys.stdin.read().strip()
-          if not raw:
-              print(json.dumps({"error":"empty APP_JSON for robot"}))
-              sys.exit(1)
-          data = json.loads(raw)
-          if 'properties' not in data or 'template' not in data['properties']:
-              print(json.dumps({"error":"invalid response for robot app","data":data}))
-              sys.exit(1)
-          tmpl = data['properties']['template']
-          containers = tmpl.get('containers', [])
-          if not containers:
-              print(json.dumps({"error":"no containers found","data":data}))
-              sys.exit(1)
-          registry = os.environ["REGISTRY"]
-          image = os.environ["ROBOT_IMAGE"]
-          sha = os.environ["GITHUB_SHA"]
-          containers[0]['image'] = f"{registry}/{image}:{sha}"
-          print(json.dumps({"properties":{"template":{"containers":containers}}}))
-          PY
-          )
+          NEW_IMAGE="${REGISTRY}/${ROBOT_IMAGE}:${GITHUB_SHA}"
+          PATCH_BODY=$(echo "$APP_JSON" | jq -c --arg img "$NEW_IMAGE" '
+            if (.properties.template.containers | length) == 0 then
+              error("no containers found")
+            else
+              .properties.template.containers[0].image = $img
+              | {properties:{template:{containers:.properties.template.containers}}}
+            end
+          ')
           PATCH_FILE=$(mktemp)
           printf '%s' "$PATCH_BODY" > "$PATCH_FILE"
           if ! PATCH_RESULT=$(az rest --method PATCH --url "$APP_URL" --body @"$PATCH_FILE" -o json 2>&1); then
