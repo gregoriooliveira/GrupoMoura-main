@@ -77,12 +77,15 @@ jobs:
       - name: Configure backend env vars
         run: |
           az config set core.only_show_errors=true
+          az containerapp secret set \
+            --resource-group "${RESOURCE_GROUP}" \
+            --name "${ACA_BACKEND_APP}" \
+            --secrets \
+              db-password="${{ secrets.DB_PASSWORD }}" \
+              splunk-hec-token="${{ secrets.SPLUNK_HEC_TOKEN }}"
           az containerapp update \
             --resource-group "${RESOURCE_GROUP}" \
             --name "${ACA_BACKEND_APP}" \
-            --set-secrets \
-              db-password="${{ secrets.DB_PASSWORD }}" \
-              splunk-hec-token="${{ secrets.SPLUNK_HEC_TOKEN }}" \
             --set-env-vars \
               DB_HOST="pg-grupo-moura.postgres.database.azure.com" \
               DB_PORT="5432" \
