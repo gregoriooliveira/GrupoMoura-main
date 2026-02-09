@@ -1,0 +1,88 @@
+{
+  "dashboard": {
+    "version": 1,
+    "name": "ACA - Infra + APM",
+    "description": "Consolidado de métricas Azure Container Apps e APM do serviço",
+    "time": {
+      "range": "-15m"
+    },
+    "variables": [
+      {
+        "name": "azure_subscription_display_name",
+        "type": "dimension",
+        "dimension": "azure_subscription_display_name",
+        "default": "azure subscription 1"
+      },
+      {
+        "name": "azure_resource_group_name",
+        "type": "dimension",
+        "dimension": "azure_resource_group_name",
+        "default": "rg-grupo-moura"
+      },
+      {
+        "name": "resource_type",
+        "type": "dimension",
+        "dimension": "resource_type",
+        "default": "microsoft.app/containerapps"
+      },
+      {
+        "name": "service",
+        "type": "dimension",
+        "dimension": "service",
+        "default": "aca-env-grupo-moura"
+      }
+    ],
+    "charts": {
+      "cpu_pct": {
+        "type": "chart",
+        "name": "CPU % (Container Apps)",
+        "programText": "A = data('CpuPercentage', filter=filter('resource_type', $resource_type) and filter('azure_resource_group_name', $azure_resource_group_name) and filter('azure_subscription_display_name', $azure_subscription_display_name)).publish(label='CPU %')"
+      },
+      "mem_pct": {
+        "type": "chart",
+        "name": "Memory % (Container Apps)",
+        "programText": "A = data('MemoryPercentage', filter=filter('resource_type', $resource_type) and filter('azure_resource_group_name', $azure_resource_group_name) and filter('azure_subscription_display_name', $azure_subscription_display_name)).publish(label='Memory %')"
+      },
+      "requests": {
+        "type": "chart",
+        "name": "Requests (Container Apps)",
+        "programText": "A = data('Requests', filter=filter('resource_type', $resource_type) and filter('azure_resource_group_name', $azure_resource_group_name) and filter('azure_subscription_display_name', $azure_subscription_display_name)).publish(label='Requests')"
+      },
+      "replicas": {
+        "type": "chart",
+        "name": "Replicas (Container Apps)",
+        "programText": "A = data('ReplicaCount', filter=filter('resource_type', $resource_type) and filter('azure_resource_group_name', $azure_resource_group_name) and filter('azure_subscription_display_name', $azure_subscription_display_name)).publish(label='Replicas')"
+      },
+      "apm_rps": {
+        "type": "chart",
+        "name": "APM - Requests/s",
+        "programText": "A = data('sf.service.request.count', filter=filter('service', $service)).sum().rate().publish(label='RPS')"
+      },
+      "apm_latency_p95": {
+        "type": "chart",
+        "name": "APM - Latency p95",
+        "programText": "A = data('sf.service.response.time', filter=filter('service', $service)).percentile(95).publish(label='p95')"
+      },
+      "apm_errors": {
+        "type": "chart",
+        "name": "APM - Error count",
+        "programText": "A = data('sf.service.error.count', filter=filter('service', $service)).sum().rate().publish(label='Errors/s')"
+      }
+    },
+    "grid": {
+      "layout": {
+        "columns": 12,
+        "rows": 6,
+        "cells": [
+          { "x": 0, "y": 0, "w": 6, "h": 2, "i": "cpu_pct" },
+          { "x": 6, "y": 0, "w": 6, "h": 2, "i": "mem_pct" },
+          { "x": 0, "y": 2, "w": 6, "h": 2, "i": "requests" },
+          { "x": 6, "y": 2, "w": 6, "h": 2, "i": "replicas" },
+          { "x": 0, "y": 4, "w": 4, "h": 2, "i": "apm_rps" },
+          { "x": 4, "y": 4, "w": 4, "h": 2, "i": "apm_latency_p95" },
+          { "x": 8, "y": 4, "w": 4, "h": 2, "i": "apm_errors" }
+        ]
+      }
+    }
+  }
+}

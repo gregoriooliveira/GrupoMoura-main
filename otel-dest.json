@@ -1,0 +1,23 @@
+﻿{
+  "properties": {
+    "openTelemetry": {
+      "destinations": [
+        {
+          "name": "splunk",
+          "type": "otlp",
+          "endpoint": "https://ingest.us1.signalfx.com",
+          "headers": [
+            {
+              "key": "X-SF-Token",
+              "value": "MbmuQZhxfUkbvsvgTCsD0w"
+            }
+          ],
+          "insecure": false,
+          "enableOpenTelemetryTraces": true,
+          "enableOpenTelemetryMetrics": true,
+          "enableOpenTelemetryLogs": true
+        }
+      ]
+    }
+  }
+}

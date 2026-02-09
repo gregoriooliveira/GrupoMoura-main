@@ -82,7 +82,8 @@ jobs:
             --name "${ACA_BACKEND_APP}" \
             --secrets \
               db-password="${{ secrets.DB_PASSWORD }}" \
-              splunk-hec-token="${{ secrets.SPLUNK_HEC_TOKEN }}"
+              splunk-hec-token="${{ secrets.SPLUNK_HEC_TOKEN }}" \
+              otel-exporter-otlp-headers="${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}"
           az containerapp update \
             --resource-group "${RESOURCE_GROUP}" \
             --name "${ACA_BACKEND_APP}" \
@@ -94,8 +95,9 @@ jobs:
               DB_NAME="postgres" \
               OTEL_SERVICE_NAME="aca-env-grupo-moura" \
               OTEL_EXPORTER_OTLP_PROTOCOL="grpc" \
-              OTEL_EXPORTER_OTLP_ENDPOINT="http://k8se-otel.k8se-apps.svc.cluster.local:4317" \
-              OTEL_EXPORTER_OTLP_METRICS_ENDPOINT="http://k8se-otel.k8se-apps.svc.cluster.local:4317" \
+              OTEL_EXPORTER_OTLP_ENDPOINT="https://ingest.us1.signalfx.com:443" \
+              OTEL_EXPORTER_OTLP_METRICS_ENDPOINT="https://ingest.us1.signalfx.com:443" \
+              OTEL_EXPORTER_OTLP_HEADERS="secretref:otel-exporter-otlp-headers" \
               OTEL_LOG_LEVEL="INFO" \
               OTEL_LOGS_EXPORTER="none" \
               SPLUNK_HEC_URL="https://http-inputs-acumuladoresmoura.splunkcloud.com/services/collector" \
