@@ -130,6 +130,16 @@ class SplunkHecTransport extends Transport {
     setImmediate(() => this.emit('logged', info));
 
     const serviceName = process.env.OTEL_SERVICE_NAME || 'api-cotacoes';
+    const resourceAttrs = parseResourceAttributes(process.env.OTEL_RESOURCE_ATTRIBUTES);
+    const deploymentEnv =
+      process.env.DEPLOYMENT_ENVIRONMENT || resourceAttrs['deployment.environment'];
+    const fields = {
+      'service.name': serviceName,
+      service: serviceName,
+    };
+    if (deploymentEnv) {
+      fields['deployment.environment'] = deploymentEnv;
+    }
     const payload = {
       time: Date.now() / 1000,
       host: this.host,
@@ -142,10 +152,7 @@ class SplunkHecTransport extends Transport {
         trace_id: info.trace_id,
         span_id: info.span_id,
       },
-      fields: {
-        'service.name': serviceName,
-        service: serviceName,
-      },
+      fields,
     };
 
     axios
