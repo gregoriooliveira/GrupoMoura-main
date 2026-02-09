@@ -129,6 +129,7 @@ class SplunkHecTransport extends Transport {
   log(info, callback) {
     setImmediate(() => this.emit('logged', info));
 
+    const serviceName = process.env.OTEL_SERVICE_NAME || 'api-cotacoes';
     const payload = {
       time: Date.now() / 1000,
       host: this.host,
@@ -142,7 +143,8 @@ class SplunkHecTransport extends Transport {
         span_id: info.span_id,
       },
       fields: {
-        service: process.env.OTEL_SERVICE_NAME || 'api-cotacoes',
+        'service.name': serviceName,
+        service: serviceName,
       },
     };
 
