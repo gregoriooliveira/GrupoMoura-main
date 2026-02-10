@@ -25,6 +25,12 @@ function setSpanAttributes(attrs) {
 const app = express();
 const port = process.env.PORT || 3000;
 
+logger.info('Service started', {
+  service: process.env.OTEL_SERVICE_NAME,
+  version: process.env.SERVICE_VERSION,
+  environment: process.env.DEPLOYMENT_ENVIRONMENT,
+});
+
 // Middleware para parsing JSON
 app.use(express.json());
 

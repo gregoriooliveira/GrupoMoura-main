@@ -94,16 +94,19 @@ jobs:
               DB_PASSWORD="secretref:db-password" \
               DB_NAME="postgres" \
               OTEL_SERVICE_NAME="greg-aca-lab" \
-              OTEL_RESOURCE_ATTRIBUTES="deployment.environment=hml" \
+              SPLUNK_SERVICE_NAME="greg-aca-lab" \
+              OTEL_RESOURCE_ATTRIBUTES="deployment.environment=hml,service.version=${GITHUB_SHA}" \
               DEPLOYMENT_ENVIRONMENT="hml" \
               OTEL_EXPORTER_OTLP_PROTOCOL="grpc" \
               OTEL_EXPORTER_OTLP_ENDPOINT="https://ingest.us1.signalfx.com:443" \
               OTEL_EXPORTER_OTLP_METRICS_ENDPOINT="https://ingest.us1.signalfx.com/v2/datapoint/otlp" \
               OTEL_EXPORTER_OTLP_HEADERS="secretref:otel-exporter-otlp-headers" \
+              OTEL_METRICS_EXPORTER="otlp" \
               OTEL_LOG_LEVEL="INFO" \
               OTEL_LOGS_EXPORTER="none" \
               SPLUNK_METRICS_ENABLED="true" \
               SPLUNK_RUNTIME_METRICS_ENABLED="true" \
+              SERVICE_VERSION="${GITHUB_SHA}" \
               SPLUNK_HEC_URL="https://http-inputs-acumuladoresmoura.splunkcloud.com/services/collector" \
               SPLUNK_HEC_TOKEN="secretref:splunk-hec-token" \
               SPLUNK_HEC_SOURCE="backend" \
