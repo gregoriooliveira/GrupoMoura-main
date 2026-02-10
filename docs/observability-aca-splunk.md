@@ -41,6 +41,9 @@ Substituir `console.*` por `logger.*`.
 
 ## O que precisa ser feito no ACA (variáveis do container)
 
+Arquivo que define as vari?veis do ACA: `.github/workflows/aca-deploy.yml` (step `Configure backend env vars`).
+
+
 ### Traces e métricas → Splunk Observability (Moura)
 ```
 OTEL_SERVICE_NAME=greg-aca-lab
