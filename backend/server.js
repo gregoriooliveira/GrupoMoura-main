@@ -2,7 +2,7 @@ const { logger } = require('./otel-logs');
 const express = require('express');
 const { Pool } = require('pg');
 const axios = require('axios');
-const { trace } = require('@opentelemetry/api');
+const { trace, metrics } = require('@opentelemetry/api');
 require('dotenv').config();
 
 // Helper: adiciona atributos ao span ativo do trace (visíveis no Splunk/OTel)
@@ -29,6 +29,17 @@ logger.info('Service started', {
   service: process.env.OTEL_SERVICE_NAME,
   version: process.env.SERVICE_VERSION,
   environment: process.env.DEPLOYMENT_ENVIRONMENT,
+});
+
+// Emit a simple custom metric to validate metrics pipeline for this service.
+const meter = metrics.getMeter('app-metrics');
+const startupCounter = meter.createCounter('app.startup', {
+  description: 'Startup counter to validate metrics export',
+});
+startupCounter.add(1, {
+  'service.name': process.env.OTEL_SERVICE_NAME,
+  'deployment.environment': process.env.DEPLOYMENT_ENVIRONMENT,
+  'service.version': process.env.SERVICE_VERSION,
 });
 
 // Middleware para parsing JSON
