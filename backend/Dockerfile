@@ -9,6 +9,7 @@ RUN --mount=type=cache,target=/root/.npm \
 
 COPY server.js ./server.js
 COPY otel-logs.js ./otel-logs.js
+COPY otel-bootstrap.js ./otel-bootstrap.js
 
 EXPOSE 3000
 
