@@ -97,8 +97,10 @@ jobs:
               SPLUNK_SERVICE_NAME="greg-aca-lab" \
               OTEL_RESOURCE_ATTRIBUTES="deployment.environment=hml,service.version=${GITHUB_SHA}" \
               DEPLOYMENT_ENVIRONMENT="hml" \
-              OTEL_EXPORTER_OTLP_PROTOCOL="grpc" \
-              OTEL_EXPORTER_OTLP_ENDPOINT="https://ingest.us1.signalfx.com:443" \
+              OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf" \
+              OTEL_EXPORTER_OTLP_ENDPOINT="https://ingest.us1.signalfx.com" \
+              OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="https://ingest.us1.signalfx.com/v2/trace/otlp" \
+              OTEL_EXPORTER_OTLP_METRICS_ENDPOINT="https://ingest.us1.signalfx.com/v2/datapoint/otlp" \
               OTEL_EXPORTER_OTLP_HEADERS="secretref:otel-exporter-otlp-headers" \
               OTEL_METRICS_EXPORTER="otlp" \
               OTEL_LOG_LEVEL="INFO" \
