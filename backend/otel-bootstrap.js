@@ -2,10 +2,12 @@
 // Keep this tiny so it runs before app code.
 const { start } = require('@splunk/otel');
 
+const serviceName =
+  process.env.OTEL_SERVICE_NAME || process.env.SPLUNK_SERVICE_NAME;
+
 start({
-  // serviceName is picked up from OTEL_SERVICE_NAME when not set here.
+  serviceName,
   metrics: {
     runtimeMetricsEnabled: true,
   },
 });
-
