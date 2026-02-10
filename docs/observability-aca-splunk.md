@@ -71,6 +71,35 @@ OTEL_LOGS_EXPORTER=none
 4. Traces visíveis no Splunk Observability.
 5. Logs visíveis no Splunk Core.
 
+
+## Correlacao de Logs com Traces (Log Observer Connect)
+Para a aba `Logs` dentro do APM funcionar, os logs precisam ter os mesmos atributos que o APM usa para filtrar.
+
+### Campos obrigatorios nos logs
+- `service.name` (mesmo valor de `OTEL_SERVICE_NAME`).
+- `trace.id` e `span.id` (ou aliases que mapeiem `trace_id` -> `trace.id` e `span_id` -> `span.id`).
+- `deployment.environment` (quando o APM filtra por ambiente).
+
+### Passos no Splunk Observability
+1. `Settings` -> `Logs Connections`: crie o entity mapping de `service.name` para o seu index.
+2. `Settings` -> `Log Observer field aliasing`: crie aliases:
+   - `trace_id` -> `trace.id`
+   - `span_id` -> `span.id`
+3. No APM, selecione o `Environment` correto (por exemplo `hml`) na aba do servico.
+
+### Variaveis recomendadas no container
+```
+OTEL_SERVICE_NAME=greg-aca-lab
+OTEL_RESOURCE_ATTRIBUTES=deployment.environment=hml
+DEPLOYMENT_ENVIRONMENT=hml
+```
+
+## Por que alguns spans nao tem logs
+Mesmo com correlacao correta, nem todo span vai ter log associado. Os logs so aparecem quando o app realmente chama `logger.*`. Spans de auto-instrumentacao (ex.: `pg`, `dns`, `http`) nao geram logs automaticamente. Outros motivos comuns:
+- Log level alto demais (ex.: `info` e o log foi `debug`).
+- Erros tratados sem log.
+- Log gerado fora do contexto ativo (perda de contexto).
+
 ## Conclusão
 Com essa abordagem, o app envia **telemetria completa** sem sidecar:
 - Traces/métricas → Splunk Observability

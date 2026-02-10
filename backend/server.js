@@ -36,6 +36,12 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD || 'postgres',
   port: process.env.DB_PORT || 5432,
 });
+pool.on('error', (error) => {
+  logger.error('Erro no pool de conex?es do banco de dados', {
+    error: error && error.message ? error.message : error,
+  });
+});
+
 
 // Estado da conexão com o banco de dados
 let isDatabaseConnected = false;
@@ -54,8 +60,14 @@ async function testDatabaseConnection() {
     return true;
   } catch (error) {
     if (isDatabaseConnected) {
-      logger.warn('Conexão com o banco de dados perdida');
+      logger.warn('Conex?o com o banco de dados perdida', {
+        error: error && error.message ? error.message : error,
+      });
       isDatabaseConnected = false;
+    } else {
+      logger.warn('Falha ao conectar com o banco de dados', {
+        error: error && error.message ? error.message : error,
+      });
     }
     return false;
   }
