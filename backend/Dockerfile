@@ -13,4 +13,4 @@ COPY otel-logs.js ./otel-logs.js
 EXPOSE 3000
 
 # CMD ["npm", "start"]
-CMD [ "node", "-r", "@splunk/otel/instrument", "server.js"]
+CMD [ "node", "-r", "./otel-bootstrap.js", "server.js"]
