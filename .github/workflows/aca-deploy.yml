@@ -98,7 +98,7 @@ jobs:
               DEPLOYMENT_ENVIRONMENT="hml" \
               OTEL_EXPORTER_OTLP_PROTOCOL="grpc" \
               OTEL_EXPORTER_OTLP_ENDPOINT="https://ingest.us1.signalfx.com:443" \
-              OTEL_EXPORTER_OTLP_METRICS_ENDPOINT="https://ingest.us1.signalfx.com:443" \
+              OTEL_EXPORTER_OTLP_METRICS_ENDPOINT="https://ingest.us1.signalfx.com/v2/datapoint/otlp" \
               OTEL_EXPORTER_OTLP_HEADERS="secretref:otel-exporter-otlp-headers" \
               OTEL_LOG_LEVEL="INFO" \
               OTEL_LOGS_EXPORTER="none" \

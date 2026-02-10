@@ -49,7 +49,7 @@ Arquivo que define as vari?veis do ACA: `.github/workflows/aca-deploy.yml` (step
 OTEL_SERVICE_NAME=greg-aca-lab
 OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 OTEL_EXPORTER_OTLP_ENDPOINT=https://ingest.us1.signalfx.com:443
-OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://ingest.us1.signalfx.com:443
+OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://ingest.us1.signalfx.com/v2/datapoint/otlp
 OTEL_EXPORTER_OTLP_HEADERS=X-SF-Token=<token_observability_moura>
 ```
 
