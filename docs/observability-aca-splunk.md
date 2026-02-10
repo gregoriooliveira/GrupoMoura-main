@@ -43,7 +43,7 @@ Substituir `console.*` por `logger.*`.
 
 ### Traces e métricas → Splunk Observability (Moura)
 ```
-OTEL_SERVICE_NAME=aca-env-grupo-moura
+OTEL_SERVICE_NAME=greg-aca-lab
 OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 OTEL_EXPORTER_OTLP_ENDPOINT=https://ingest.us1.signalfx.com:443
 OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://ingest.us1.signalfx.com:443
@@ -56,7 +56,7 @@ SPLUNK_HEC_URL=https://http-inputs-acumuladoresmoura.splunkcloud.com/services/co
 SPLUNK_HEC_TOKEN=<token_hec_moura>
 SPLUNK_HEC_SOURCE=backend
 SPLUNK_HEC_SOURCETYPE=_json
-SPLUNK_HEC_HOST=aca-env-grupo-moura
+SPLUNK_HEC_HOST=greg-aca-lab
 ```
 
 ### Evitar duplicidade de logs via OTel
