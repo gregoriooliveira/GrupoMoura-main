@@ -98,7 +98,8 @@ jobs:
           set -euo pipefail
           az config set core.only_show_errors=true
           LOCATION="${AZURE_LOCATION:-eastus2}"
-          if ! az postgres flexible-server show --resource-group "${RESOURCE_GROUP}" --name "${POSTGRES_SERVER}" 1>/dev/null 2>/dev/null; then
+          create_pg() {
+            local pg_version="$1"
             az postgres flexible-server create \
               --resource-group "${RESOURCE_GROUP}" \
               --name "${POSTGRES_SERVER}" \
@@ -107,9 +108,35 @@ jobs:
               --admin-password "${{ secrets.DB_PASSWORD }}" \
               --sku-name Standard_B1ms \
               --tier Burstable \
-              --version 16 \
+              --version "${pg_version}" \
               --storage-size 32 \
               --public-access 0.0.0.0 1>/dev/null
+          }
+          if ! az postgres flexible-server show --resource-group "${RESOURCE_GROUP}" --name "${POSTGRES_SERVER}" 1>/dev/null 2>/dev/null; then
+            created=0
+            for attempt in 1 2 3; do
+              if create_pg "16"; then
+                created=1
+                break
+              fi
+              echo "PostgreSQL create attempt ${attempt}/3 failed. Retrying in 30s..."
+              sleep 30
+            done
+            if [ "${created}" -ne 1 ]; then
+              echo "Retrying with PostgreSQL version 15..."
+              for attempt in 1 2; do
+                if create_pg "15"; then
+                  created=1
+                  break
+                fi
+                echo "PostgreSQL v15 create attempt ${attempt}/2 failed. Retrying in 30s..."
+                sleep 30
+              done
+            fi
+            if [ "${created}" -ne 1 ]; then
+              echo "ERROR: PostgreSQL creation failed after retries."
+              exit 1
+            fi
           fi
           az postgres flexible-server firewall-rule create \
             --resource-group "${RESOURCE_GROUP}" \
