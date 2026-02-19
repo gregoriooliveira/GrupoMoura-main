@@ -14,11 +14,11 @@ env:
   BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/nodejs-lab-backend
   ROBOT_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/nodejs-lab-robot
   RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
-  AZURE_LOCATION: ${{ secrets.AZURE_LOCATION }}
-  ACA_ENVIRONMENT: ${{ secrets.ACA_ENVIRONMENT }}
+  AZURE_LOCATION: brazilsouth
+  ACA_ENVIRONMENT: aca-env-grupo-moura
   ACA_BACKEND_APP: ${{ secrets.ACA_BACKEND_APP }}
   ACA_ROBOT_APP: ${{ secrets.ACA_ROBOT_APP }}
-  POSTGRES_SERVER: ${{ secrets.POSTGRES_SERVER }}
+  POSTGRES_SERVER: pg-grupo-moura
 
 jobs:
   provision:
