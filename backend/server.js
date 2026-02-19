@@ -22,6 +22,22 @@ function setSpanAttributes(attrs) {
   }
 }
 
+
+// Helper: extrai valor numerico da cotacao em diferentes formatos de resposta
+function extractCotacaoValue(cotacaoData) {
+  if (!cotacaoData) return null;
+  if (cotacaoData.compra) return parseFloat(cotacaoData.compra);
+  if (cotacaoData.bid) return parseFloat(cotacaoData.bid);
+  if (cotacaoData.valor) return parseFloat(cotacaoData.valor);
+  if (cotacaoData.cotacao) return parseFloat(cotacaoData.cotacao);
+  if (typeof cotacaoData === 'number') return cotacaoData;
+  const valores = Object.values(cotacaoData).filter(
+    (v) => typeof v === 'number' && v > 0
+  );
+  if (valores.length > 0) return valores[0];
+  return null;
+}
+
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -42,9 +58,93 @@ startupCounter.add(1, {
   'service.version': process.env.SERVICE_VERSION,
 });
 
+// Business metrics (counters + histograms) for dashboards/alerts.
+const conversoesTotal = meter.createCounter('app.conversoes_total', {
+  description: 'Total de conversoes de dolar',
+});
+const cotacaoTotal = meter.createCounter('app.cotacao_total', {
+  description: 'Total de consultas de cotacao',
+});
+const cotacaoDolarHist = meter.createHistogram('app.cotacao_dolar', {
+  description: 'Cotacao do dolar usada nas conversoes',
+  unit: 'usd',
+});
+const cotacaoValorHist = meter.createHistogram('app.cotacao_valor', {
+  description: 'Valor da cotacao consultada',
+  unit: 'brl',
+});
+const dolaresCompradosHist = meter.createHistogram('app.dolares_comprados', {
+  description: 'Quantidade de dolares comprados',
+  unit: 'usd',
+});
+const valorCompraReaisHist = meter.createHistogram('app.valor_compra_reais', {
+  description: 'Valor de compra em reais',
+  unit: 'brl',
+});
+const valorMaximoReaisHist = meter.createHistogram('app.valor_maximo_reais', {
+  description: 'Valor maximo em reais informado pelo cliente',
+  unit: 'brl',
+});
+
+function recordConversaoMetrics(params) {
+  const { categoria, status, cotacao, dolares, valorCompra, valorMaximo, limitStatus } = params;
+  const baseAttrs = {
+    categoria,
+    endpoint: '/conversao/dolar',
+    status,
+  };
+  conversoesTotal.add(1, baseAttrs);
+
+  if (status !== 'success') return;
+  if (typeof cotacao === 'number' && !isNaN(cotacao)) {
+    cotacaoDolarHist.record(cotacao, { endpoint: '/conversao/dolar' });
+  }
+  if (typeof dolares === 'number' && !isNaN(dolares)) {
+    dolaresCompradosHist.record(dolares, {
+      categoria,
+      endpoint: '/conversao/dolar',
+    });
+  }
+  if (typeof valorCompra === 'number' && !isNaN(valorCompra)) {
+    valorCompraReaisHist.record(valorCompra, {
+      categoria,
+      endpoint: '/conversao/dolar',
+    });
+  }
+  if (typeof valorMaximo === 'number' && !isNaN(valorMaximo)) {
+    valorMaximoReaisHist.record(valorMaximo, {
+      categoria,
+      endpoint: '/conversao/dolar',
+      status_limit: limitStatus,
+    });
+  }
+}
+
+function recordCotacaoMetrics(params) {
+  const { moeda, endpoint, status, cotacao } = params;
+  const attrs = { moeda, endpoint, status };
+  cotacaoTotal.add(1, attrs);
+  if (status === 'success' && typeof cotacao === 'number' && !isNaN(cotacao)) {
+    cotacaoValorHist.record(cotacao, { moeda, endpoint });
+  }
+}
+
+
 // Middleware para parsing JSON
 app.use(express.json());
 
+function resolvePgSslConfig() {
+  const dbSsl = (process.env.DB_SSL || '').toLowerCase();
+  if (dbSsl === 'false' || dbSsl === '0' || dbSsl === 'off') return false;
+  if (dbSsl === 'true' || dbSsl === '1' || dbSsl === 'on' || dbSsl === 'require') {
+    return { rejectUnauthorized: false };
+  }
+  const host = (process.env.DB_HOST || '').toLowerCase();
+  if (host.endsWith('.postgres.database.azure.com')) {
+    return { rejectUnauthorized: false };
+  }
+  return false;
+}
 // Configuração do pool de conexões PostgreSQL
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
@@ -52,6 +152,7 @@ const pool = new Pool({
   database: process.env.DB_NAME || 'cotacoes',
   password: process.env.DB_PASSWORD || 'postgres',
   port: process.env.DB_PORT || 5432,
+  ssl: resolvePgSslConfig(),
 });
 pool.on('error', (error) => {
   logger.error('Erro no pool de conex?es do banco de dados', {
@@ -180,7 +281,10 @@ app.get('/cotacao/dolar', async (req, res) => {
     const response = await axios.get('https://br.dolarapi.com/v1/cotacoes/usd');
     const responseData = response.data;
 
-    setSpanAttributes({ endpoint: '/cotacao/dolar', cotacao: responseData?.compra ?? responseData?.bid ?? responseData?.valor });
+    const cotacaoValor = extractCotacaoValue(responseData);
+
+    setSpanAttributes({ endpoint: '/cotacao/dolar', cotacao: cotacaoValor });
+    recordCotacaoMetrics({ moeda: 'usd', endpoint: '/cotacao/dolar', status: 'success', cotacao: cotacaoValor });
     
     await saveToAudit('/cotacao/dolar', requestData, responseData);
     
@@ -192,6 +296,7 @@ app.get('/cotacao/dolar', async (req, res) => {
     res.json(responseData);
   } catch (error) {
     setSpanAttributes({ endpoint: '/cotacao/dolar', error: error.message });
+    recordCotacaoMetrics({ moeda: 'usd', endpoint: '/cotacao/dolar', status: 'error' });
     const errorResponse = {
       error: 'Erro ao buscar cotação do dólar',
       message: error.message
@@ -211,7 +316,10 @@ app.get('/cotacao/euro', async (req, res) => {
     const response = await axios.get('https://br.dolarapi.com/v1/cotacoes/eur');
     const responseData = response.data;
 
-    setSpanAttributes({ endpoint: '/cotacao/euro', cotacao: responseData?.compra ?? responseData?.bid ?? responseData?.valor });
+    const cotacaoValor = extractCotacaoValue(responseData);
+
+    setSpanAttributes({ endpoint: '/cotacao/euro', cotacao: cotacaoValor });
+    recordCotacaoMetrics({ moeda: 'eur', endpoint: '/cotacao/euro', status: 'success', cotacao: cotacaoValor });
     
     await saveToAudit('/cotacao/euro', requestData, responseData);
     
@@ -223,6 +331,7 @@ app.get('/cotacao/euro', async (req, res) => {
     res.json(responseData);
   } catch (error) {
     setSpanAttributes({ endpoint: '/cotacao/euro', error: error.message });
+    recordCotacaoMetrics({ moeda: 'eur', endpoint: '/cotacao/euro', status: 'error' });
     const errorResponse = {
       error: 'Erro ao buscar cotação do euro',
       message: error.message
@@ -359,6 +468,19 @@ app.post('/conversao/dolar', async (req, res) => {
       }
       responseData.valor_maximo = valorMaximoNum;
     }
+    let limitStatus = null;
+    if (valorMaximoNum !== null) {
+      limitStatus = valorMaximoNum <= cotacao ? 'within' : 'exceeds';
+    }
+    recordConversaoMetrics({
+      categoria,
+      status: 'success',
+      cotacao,
+      dolares: dolaresCompradosRounded,
+      valorCompra: valorCompraNum,
+      valorMaximo: valorMaximoNum,
+      limitStatus,
+    });
     
     await saveToAudit('/conversao/dolar', requestData, responseData);
     
@@ -370,6 +492,7 @@ app.post('/conversao/dolar', async (req, res) => {
     res.json(responseData);
   } catch (error) {
     setSpanAttributes({ error: error.message });
+    recordConversaoMetrics({ categoria, status: 'error' });
     const errorResponse = {
       error: 'Erro ao calcular conversão de dólar',
       message: error.message
@@ -524,3 +647,4 @@ app.listen(port, '0.0.0.0', () => {
   // Iniciar verificação de saúde do banco de dados
   startDatabaseHealthCheck();
 });
+

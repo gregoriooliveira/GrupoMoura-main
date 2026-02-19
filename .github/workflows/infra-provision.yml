@@ -165,6 +165,7 @@ jobs:
               DB_USER="${POSTGRES_ADMIN_USER}@${POSTGRES_SERVER}" \
               DB_PASSWORD="secretref:db-password" \
               DB_NAME="postgres" \
+              DB_SSL="require" \
               OTEL_SERVICE_NAME="greg-aca-lab" \
               SPLUNK_SERVICE_NAME="greg-aca-lab" \
               OTEL_RESOURCE_ATTRIBUTES="deployment.environment=hml" \
