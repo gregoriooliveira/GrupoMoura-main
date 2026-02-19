@@ -18,6 +18,7 @@ env:
   ACA_ENVIRONMENT: ${{ secrets.ACA_ENVIRONMENT }}
   ACA_BACKEND_APP: ${{ secrets.ACA_BACKEND_APP }}
   ACA_ROBOT_APP: ${{ secrets.ACA_ROBOT_APP }}
+  POSTGRES_SERVER: ${{ secrets.POSTGRES_SERVER }}
 
 jobs:
   build-and-deploy:
@@ -76,6 +77,7 @@ jobs:
 
       - name: Configure backend env vars
         run: |
+          PG_ADMIN_USER="admin"
           az config set core.only_show_errors=true
           az containerapp secret set \
             --resource-group "${RESOURCE_GROUP}" \
@@ -88,9 +90,9 @@ jobs:
             --resource-group "${RESOURCE_GROUP}" \
             --name "${ACA_BACKEND_APP}" \
             --set-env-vars \
-              DB_HOST="pg-grupo-moura.postgres.database.azure.com" \
+              DB_HOST="${POSTGRES_SERVER}.postgres.database.azure.com" \
               DB_PORT="5432" \
-              DB_USER="admin@pg-grupo-moura" \
+              DB_USER="${PG_ADMIN_USER}@${POSTGRES_SERVER}" \
               DB_PASSWORD="secretref:db-password" \
               DB_NAME="postgres" \
               OTEL_SERVICE_NAME="greg-aca-lab" \
@@ -113,6 +115,17 @@ jobs:
               SPLUNK_HEC_SOURCE="backend" \
               SPLUNK_HEC_SOURCETYPE="_json" \
               SPLUNK_HEC_HOST="greg-aca-lab"
+
+      - name: Configure robot env vars
+        run: |
+          set -euo pipefail
+          az config set core.only_show_errors=true
+          BACKEND_FQDN="$(az containerapp show --resource-group "${RESOURCE_GROUP}" --name "${ACA_BACKEND_APP}" --query properties.configuration.ingress.fqdn -o tsv)"
+          az containerapp update \
+            --resource-group "${RESOURCE_GROUP}" \
+            --name "${ACA_ROBOT_APP}" \
+            --set-env-vars \
+              BACKEND_URL="https://${BACKEND_FQDN}"
 
       - name: Deploy backend to ACA
         run: |

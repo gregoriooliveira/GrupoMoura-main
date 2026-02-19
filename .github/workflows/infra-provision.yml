@@ -1,0 +1,169 @@
+name: Provision Azure Infra
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  REGISTRY: docker.io
+  DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+  BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/nodejs-lab-backend
+  ROBOT_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/nodejs-lab-robot
+  RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+  AZURE_LOCATION: ${{ secrets.AZURE_LOCATION }}
+  ACA_ENVIRONMENT: ${{ secrets.ACA_ENVIRONMENT }}
+  ACA_BACKEND_APP: ${{ secrets.ACA_BACKEND_APP }}
+  ACA_ROBOT_APP: ${{ secrets.ACA_ROBOT_APP }}
+  POSTGRES_SERVER: ${{ secrets.POSTGRES_SERVER }}
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set Azure subscription
+        run: az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Ensure Azure CLI extensions
+        run: |
+          az extension add --name containerapp --upgrade
+
+      - name: Ensure resource group and ACA environment
+        run: |
+          set -euo pipefail
+          az config set core.only_show_errors=true
+          LOCATION="${AZURE_LOCATION:-eastus}"
+          if [ "$(az group exists --name "${RESOURCE_GROUP}")" != "true" ]; then
+            az group create --name "${RESOURCE_GROUP}" --location "${LOCATION}" 1>/dev/null
+          fi
+          if ! az containerapp env show --resource-group "${RESOURCE_GROUP}" --name "${ACA_ENVIRONMENT}" 1>/dev/null 2>/dev/null; then
+            az containerapp env create \
+              --resource-group "${RESOURCE_GROUP}" \
+              --name "${ACA_ENVIRONMENT}" \
+              --location "${LOCATION}" 1>/dev/null
+          fi
+
+      - name: Ensure PostgreSQL Flexible Server
+        run: |
+          set -euo pipefail
+          az config set core.only_show_errors=true
+          LOCATION="${AZURE_LOCATION:-eastus}"
+          PG_ADMIN_USER="admin"
+          if ! az postgres flexible-server show --resource-group "${RESOURCE_GROUP}" --name "${POSTGRES_SERVER}" 1>/dev/null 2>/dev/null; then
+            az postgres flexible-server create \
+              --resource-group "${RESOURCE_GROUP}" \
+              --name "${POSTGRES_SERVER}" \
+              --location "${LOCATION}" \
+              --admin-user "${PG_ADMIN_USER}" \
+              --admin-password "${{ secrets.DB_PASSWORD }}" \
+              --sku-name Standard_B1ms \
+              --tier Burstable \
+              --version 16 \
+              --storage-size 32 \
+              --public-access 0.0.0.0 1>/dev/null
+          fi
+          az postgres flexible-server firewall-rule create \
+            --resource-group "${RESOURCE_GROUP}" \
+            --name "${POSTGRES_SERVER}" \
+            --rule-name "allow-azure-services" \
+            --start-ip-address 0.0.0.0 \
+            --end-ip-address 0.0.0.0 1>/dev/null
+
+      - name: Ensure backend and robot apps exist
+        run: |
+          set -euo pipefail
+          az config set core.only_show_errors=true
+          BACKEND_IMAGE_REF="${REGISTRY}/${BACKEND_IMAGE}:latest"
+          ROBOT_IMAGE_REF="${REGISTRY}/${ROBOT_IMAGE}:latest"
+
+          if ! az containerapp show --resource-group "${RESOURCE_GROUP}" --name "${ACA_BACKEND_APP}" 1>/dev/null 2>/dev/null; then
+            az containerapp create \
+              --resource-group "${RESOURCE_GROUP}" \
+              --environment "${ACA_ENVIRONMENT}" \
+              --name "${ACA_BACKEND_APP}" \
+              --image "${BACKEND_IMAGE_REF}" \
+              --ingress external \
+              --target-port 3000 \
+              --min-replicas 1 \
+              --max-replicas 2 \
+              --registry-server "${REGISTRY}" \
+              --registry-username "${DOCKERHUB_USER}" \
+              --registry-password "${DOCKERHUB_TOKEN}" 1>/dev/null
+          fi
+
+          BACKEND_FQDN="$(az containerapp show --resource-group "${RESOURCE_GROUP}" --name "${ACA_BACKEND_APP}" --query properties.configuration.ingress.fqdn -o tsv)"
+          BACKEND_URL="https://${BACKEND_FQDN}"
+
+          if ! az containerapp show --resource-group "${RESOURCE_GROUP}" --name "${ACA_ROBOT_APP}" 1>/dev/null 2>/dev/null; then
+            az containerapp create \
+              --resource-group "${RESOURCE_GROUP}" \
+              --environment "${ACA_ENVIRONMENT}" \
+              --name "${ACA_ROBOT_APP}" \
+              --image "${ROBOT_IMAGE_REF}" \
+              --min-replicas 1 \
+              --max-replicas 1 \
+              --registry-server "${REGISTRY}" \
+              --registry-username "${DOCKERHUB_USER}" \
+              --registry-password "${DOCKERHUB_TOKEN}" \
+              --env-vars BACKEND_URL="${BACKEND_URL}" 1>/dev/null
+          fi
+
+      - name: Configure backend env vars and secrets
+        run: |
+          set -euo pipefail
+          az config set core.only_show_errors=true
+          PG_ADMIN_USER="admin"
+          az containerapp secret set \
+            --resource-group "${RESOURCE_GROUP}" \
+            --name "${ACA_BACKEND_APP}" \
+            --secrets \
+              db-password="${{ secrets.DB_PASSWORD }}" \
+              splunk-hec-token="${{ secrets.SPLUNK_HEC_TOKEN }}" \
+              otel-exporter-otlp-headers="${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}"
+          az containerapp update \
+            --resource-group "${RESOURCE_GROUP}" \
+            --name "${ACA_BACKEND_APP}" \
+            --set-env-vars \
+              DB_HOST="${POSTGRES_SERVER}.postgres.database.azure.com" \
+              DB_PORT="5432" \
+              DB_USER="${PG_ADMIN_USER}@${POSTGRES_SERVER}" \
+              DB_PASSWORD="secretref:db-password" \
+              DB_NAME="postgres" \
+              OTEL_SERVICE_NAME="greg-aca-lab" \
+              SPLUNK_SERVICE_NAME="greg-aca-lab" \
+              OTEL_RESOURCE_ATTRIBUTES="deployment.environment=hml" \
+              DEPLOYMENT_ENVIRONMENT="hml" \
+              OTEL_EXPORTER_OTLP_PROTOCOL="grpc" \
+              OTEL_EXPORTER_OTLP_ENDPOINT="https://ingest.us1.signalfx.com:443" \
+              OTEL_EXPORTER_OTLP_HEADERS="secretref:otel-exporter-otlp-headers" \
+              OTEL_METRICS_EXPORTER="otlp" \
+              OTEL_LOG_LEVEL="INFO" \
+              OTEL_LOGS_EXPORTER="none" \
+              SPLUNK_METRICS_ENABLED="true" \
+              SPLUNK_RUNTIME_METRICS_ENABLED="true" \
+              SPLUNK_HEC_URL="https://http-inputs-acumuladoresmoura.splunkcloud.com/services/collector" \
+              SPLUNK_HEC_TOKEN="secretref:splunk-hec-token" \
+              SPLUNK_HEC_SOURCE="backend" \
+              SPLUNK_HEC_SOURCETYPE="_json" \
+              SPLUNK_HEC_HOST="greg-aca-lab"
+
+      - name: Configure robot env vars
+        run: |
+          set -euo pipefail
+          az config set core.only_show_errors=true
+          BACKEND_FQDN="$(az containerapp show --resource-group "${RESOURCE_GROUP}" --name "${ACA_BACKEND_APP}" --query properties.configuration.ingress.fqdn -o tsv)"
+          az containerapp update \
+            --resource-group "${RESOURCE_GROUP}" \
+            --name "${ACA_ROBOT_APP}" \
+            --set-env-vars \
+              BACKEND_URL="https://${BACKEND_FQDN}"
